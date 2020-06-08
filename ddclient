@@ -415,6 +415,7 @@ my %variables = (
         'mtime'               => setv(T_NUMBER, 0, 1, 0, 0,                   undef),
         'atime'               => setv(T_NUMBER, 0, 1, 0, 0,                   undef),
         'status'              => setv(T_ANY,    0, 1, 0, '',                  undef),
+        'status-ipv6'         => setv(T_ANY,    0, 1, 0, '',              undef),
         'min-interval'        => setv(T_DELAY,  0, 0, 1, interval('30s'),     0),
         'max-interval'        => setv(T_DELAY,  0, 0, 1, interval('25d'),     0),
         'min-error-interval'  => setv(T_DELAY,  0, 0, 1, interval('5m'),      0),
@@ -2698,7 +2699,7 @@ sub nic_updateable {
 
     } elsif ((defined($config{$host}{'usev6'}) && ($config{$host}{'usev6'} ne 'no') ) &&
 			 ((!exists($cache{$host}{'ipv6'})) || ("$cache{$host}{'ipv6'}" ne "$ipv6"))) {
-        if (($cache{$host}{'status'} eq 'good') &&
+        if (($cache{$host}{'status-ipv6'} eq 'good') &&
              !interval_expired($host, 'mtime', 'min-interval')) {
             warning("skipping update of %s from %s to %s.\nlast updated %s.\nWait at least %s between update attempts.",
 			 $host,
@@ -2710,7 +2711,7 @@ sub nic_updateable {
             if opt('verbose') || !define($cache{$host}{'warned-min-interval'}, 0);
 				$cache{$host}{'warned-min-interval'} = $now;
 
-        } elsif (($cache{$host}{'status'} ne 'good') && !interval_expired($host, 'atime', 'min-error-interval')) {
+        } elsif (($cache{$host}{'status-ipv6'} ne 'good') && !interval_expired($host, 'atime', 'min-error-interval')) {
             warning("skipping update of %s from %s to %s.\nlast updated %s but last attempt on %s failed.\nWait at least %s between update attempts.",
 			 $host,
 			 ($cache{$host}{'ipv6'}    ? $cache{$host}{'ipv6'}                : '<nothing>'),
@@ -2750,6 +2751,7 @@ sub nic_updateable {
         }
     }
     $config{$host}{'status'} = define($cache{$host}{'status'}, '');
+    $config{$host}{'status-ipv6'} = define($cache{$host}{'status-ipv6'}, '');
     $config{$host}{'update'} = $update;
     if ($update) {
         $config{$host}{'status'}                    = 'noconnect';
@@ -4129,8 +4131,8 @@ sub nic_freedns_update {
             if($ipv6 eq $freedns_hosts_ipv6{$h}->[1]) {
                 $config{$h}{'ipv6'}     = $ipv6;
                 $config{$h}{'mtime'}  = $now;
-                $config{$h}{'status'} = 'good';
-                success("update not necessary %s: good: IPv6 address already set to %s", $h, $ipv6);
+                $config{$h}{'status-ipv6'} = 'good';
+                success("update not necessary %s: good: IPv6 address already set to %s", $h, $ipv6) if (!$daemon || opt('verbose'));
             } else {
                 debug("Update: %s", $freedns_hosts_ipv6{$h}->[2]."&address=".$ipv6);
                 my $reply = geturl(opt('proxy'), $freedns_hosts_ipv6{$h}->[2]."&address=".$ipv6);
@@ -4146,10 +4148,10 @@ sub nic_freedns_update {
                 if($reply =~ /Updated.*$h.*to.*$ipv6/) {
                     $config{$h}{'ipv6'}   = $ipv6;
                     $config{$h}{'mtime'}  = $now;
-                    $config{$h}{'status'} = 'good';
+                    $config{$h}{'status-ipv6'} = 'good';
                     success("updating %s: good: IPv6 address set to %s", $h, $ipv6);
                 } else {
-                    $config{$h}{'status'} = 'failed';
+                    $config{$h}{'status-ipv6'} = 'failed';
                     warning("SENT: %s", $freedns_hosts_ipv6{$h}->[2]) unless opt('verbose');
                     warning("REPLIED: %s", $reply);
                     failed("updating %s: Invalid reply.", $h);
