@@ -2112,7 +2112,6 @@ sub geturl {
     if ($force_ssl || ($globals{'ssl'} && !$is_get_ip)) {
         $use_ssl      = 1;
         $default_port = 443;
-    ##    load_ssl_support;
     } else {
         $use_ssl      = 0;
         $default_port = 80;
@@ -2221,38 +2220,57 @@ sub geturl {
 
     } else
     {
-        # Access network using cURL.
-        my $curlopt = '';
-        my $protocol = 'http';
-        $curlopt = '--ipv4' if ($ipversion eq '4');
-        $curlopt = '--ipv6' if ($ipversion eq '6');
-        if ($use_ssl) {
-            $protocol = 'https';
-            $curlopt .= ' --insecure';
-        }
-        if (!$is_get_ip) {
-            $curlopt .= ' --include';
-        }
-        if (! opt('exec')) {
-	    debug("skipped network connection");
-	    verbose("SENDING:", "%s", '${protocol}://${server}/${url}');
-        } else
-        {
-            $0 = sprintf("%s - curl sending to %s", $program, '${protocol}://${server}/${url}');
-            my $timeout = opt('timeout');
+        # Access network using cURL.  This is required for IPv6
+        if (!opt('exec')) {
+            debug("skipped network connection");
+            verbose("SENDING:", "%s", "${server}/${url}");
+        } elsif (($headers ne '')) {
+            my $timeout    = opt('timeout');
+            my @head_lines = split('\n', $headers);
+            my $head_args  = '';
+            foreach my $head_line (@head_lines) {
+                $head_args .= "-H '$head_line' ";
+            }
+
+            $0 = sprintf("%s - curl (w/headers) sending to %s", $program, "https://${server}");
+
+            $reply = <<"USE_CURL_WITH_HEADERS";
+/usr/bin/curl -s -X $method --user-agent '${program}/${version}' \\
+              --connect-timeout $timeout --max-time $timeout \\
+              ${head_args} \\
+              --data '${data}' \\
+              --url 'https://${server}/${url}' 2>/dev/null
+USE_CURL_WITH_HEADERS
+
+            if (!$reply) {
+                warning("curl (w/headers) cannot connect to https://${server}/${url}");
+            }
+        } else {
+            my $timeout  = opt('timeout');
+            my $auth     = '';
+            my $curlopt  = '';
+            my $protocol = 'http';
+            $auth    = "--user '${login}:${password}'" if (($login ne '') && ($password ne ''));
+            $curlopt = '--ipv4'                        if ($ipversion eq '4');
+            $curlopt = '--ipv6'                        if ($ipversion eq '6');
+            if ($use_ssl) {
+                $protocol = 'https';
+                $curlopt .= ' --insecure';
+            }
+
+            $0 = sprintf("%s - curl sending to %s", $program, "${protocol}://${server}");
 
             $reply = <<"USE_CURL";
-              /usr/bin/curl -si0 --user '${login}:${password}' --user-agent '${program}/${version}' \\
+/usr/bin/curl -s ${auth} --user-agent '${program}/${version}' \\
               --connect-timeout $timeout --max-time $timeout $curlopt \\
               --url '${protocol}://${server}/${url}' 2>/dev/null
 USE_CURL
 
-            if (! $reply) {
+            if (!$reply) {
                 warning("curl cannot connect to ${protocol}://${server}/${url}");
             }
         }
     }
-
 
     ## during testing simulate reading the URL
     if (opt('test')) {
