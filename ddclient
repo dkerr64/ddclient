@@ -2124,7 +2124,7 @@ sub geturl {
     debug("ip ver = %s", $ipversion);
 
     if ( (!opt('curl')) and ($ipversion ne '6') ) {
-        # Access network using perl functions.
+        # Access network using perl functions. Note that IPv6 must use curl.
         ## determine peer and port to use.
         $peer = $proxy || $server;
         $peer =~ s%/.*%%;
@@ -2233,6 +2233,7 @@ sub geturl {
                 $head_args .= "-H '$head_line' ";
             }
 
+            # don't include ${url} as that might expose login credentials
             $0 = sprintf("%s - curl (w/headers) sending to %s", $program, "https://${server}");
 
             $reply = <<"USE_CURL_WITH_HEADERS";
@@ -2244,7 +2245,8 @@ sub geturl {
 USE_CURL_WITH_HEADERS
 
             if (!$reply) {
-                warning("curl (w/headers) cannot connect to https://${server}/${url}");
+                # don't include ${url} as that might expose login credentials
+                warning("curl (w/headers) cannot connect to https://${server}");
             }
         } else {
             my $timeout  = opt('timeout');
@@ -2259,6 +2261,7 @@ USE_CURL_WITH_HEADERS
                 $curlopt .= ' --insecure';
             }
 
+            # don't include ${url} as that might expose login credentials
             $0 = sprintf("%s - curl sending to %s", $program, "${protocol}://${server}");
 
             $reply = <<"USE_CURL";
@@ -2268,7 +2271,8 @@ USE_CURL_WITH_HEADERS
 USE_CURL
 
             if (!$reply) {
-                warning("curl cannot connect to ${protocol}://${server}/${url}");
+                # don't include ${url} as that might expose login credentials
+                warning("curl cannot connect to ${protocol}://${server}");
             }
         }
     }
