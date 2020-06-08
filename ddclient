@@ -4476,6 +4476,7 @@ EoINSTR3
             if ($status eq 1) {
                 foreach (@hosts) {
                     $config{$_}{'ip'}    = $ip;
+                    $config{$_}{'ipv6'}  = $ipv6;
                     $config{$_}{'mtime'} = $now;
                     success("updating %s: %s: IP address set to %s", $_, $status, $ip);
                 }
