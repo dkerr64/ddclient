@@ -2518,6 +2518,34 @@ sub get_ipv6 {
 }
 
 ######################################################################
+## ipv6_match determine ipv6 address from given string and return them
+######################################################################
+sub ipv6_match {
+    my $content = shift;
+    my $omits;
+    my $ip          = "";
+    my $linenumbers = 0;
+
+    my @values = split('\n', $content);
+    foreach my $val (@values) {
+        next unless $val =~ /((:{0,2}[A-F0-9]{1,4}){0,7}:{1,2}[A-F0-9]{1,4})/ai; # invalid char
+        my $parsed = $1;
+
+        # check for at least 7 colons
+        my $count_colon = () = $parsed =~ /:/g;
+        if ($count_colon != 7) {
+            # or one double colon
+            my $count_double_colon = () = $parsed =~ /::/g;
+            if ($count_double_colon != 1) {
+                next
+            }
+        }
+        return $parsed;
+    }
+    return;
+}
+
+######################################################################
 ## group_hosts_by
 ######################################################################
 sub group_hosts_by {
