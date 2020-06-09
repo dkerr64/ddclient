@@ -4132,7 +4132,8 @@ sub nic_freedns_update {
     ## First get the list of updatable hosts
     my $url;
     # note, use '&v=2' in $url in order to pull IPv6 AAAA records as well as IPv4 A records
-    $url = "http://$config{$_[0]}{'server'}/api/?action=getdyndns&v=2&sha=".&sha1_hex("$config{$_[0]}{'login'}|$config{$_[0]}{'password'}");
+    $url = "http://$config{$_[0]}{'server'}/api/?action=getdyndns&v=2&sha="
+      . &sha1_hex("$config{$_[0]}{'login'}|$config{$_[0]}{'password'}");
     my $reply = geturl(opt('proxy'), $url);
     if (!defined($reply) || !$reply || !header_ok($_[0], $reply)) {
         failed("updating %s: Could not connect to %s for site list.", $_[0], $url);
@@ -4173,7 +4174,7 @@ sub nic_freedns_update {
                 $config{$h}{'ip'}     = $ip;
                 $config{$h}{'mtime'}  = $now;
                 $config{$h}{'status'} = 'good';
-                success("update not necessary %s: good: IPv4 address already set to %s", $h, $ip);
+                success("update not necessary %s: good: IPv4 address already set to %s", $h, $ip) if (!$daemon || opt('verbose'));
             } else {
                 debug("Update: %s", $freedns_hosts{$h}->[2]."&address=".$ip);
                 my $reply = geturl(opt('proxy'), $freedns_hosts{$h}->[2]."&address=".$ip);
@@ -4200,8 +4201,10 @@ sub nic_freedns_update {
             }
         } else {
             if (!$daemon || opt('verbose')) {
-                warning("%s: Cannot set IPv4 to %s No A record at FreeDNS", $h, $ip) if (!defined($freedns_hosts{$h}) && defined($ip));
-                warning("%s: Cannot set IPv4, A record exists but no address provided", $h) if (defined($freedns_hosts{$h}) && !defined($ip));
+                warning("%s: Cannot set IPv4 to %s No A record at FreeDNS", $h, $ip)
+                  if (!defined($freedns_hosts{$h}) && defined($ip));
+                warning("%s: Cannot set IPv4, A record exists but no address provided", $h)
+                  if (defined($freedns_hosts{$h}) && !defined($ip));
             }
         }
 
@@ -4237,8 +4240,10 @@ sub nic_freedns_update {
             }
         } else {
             if (!$daemon || opt('verbose')) {
-                warning("%s: Cannot set IPv6 to %s No AAAA record at FreeDNS", $h, $ipv6) if (!defined($freedns_hosts_ipv6{$h}) && defined($ipv6));
-                warning("%s: Cannot set IPv6, AAAA record exists but no address provided", $h) if (defined($freedns_hosts_ipv6{$h}) && !defined($ipv6));
+                warning("%s: Cannot set IPv6 to %s No AAAA record at FreeDNS", $h, $ipv6)
+                  if (!defined($freedns_hosts_ipv6{$h}) && defined($ipv6));
+                warning("%s: Cannot set IPv6, AAAA record exists but no address provided", $h)
+                  if (defined($freedns_hosts_ipv6{$h}) && !defined($ipv6));
             }
         }
     }
