@@ -1630,7 +1630,7 @@ sub load_file {
     } else {
         debug("Load failed from %s (%s)", $file, $!);
     }
-    return $buffer
+    return $buffer;
 }
 ######################################################################
 ## save_file
