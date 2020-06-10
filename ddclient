@@ -2340,6 +2340,7 @@ sub filter_local {
     }
     return $in_ip;
 }
+
 ######################################################################
 ## get_ip
 ######################################################################
@@ -2358,6 +2359,7 @@ sub get_ip {
         $reply = `ip -4 -o addr show dev $arg scope global 2>/dev/null`;
         $reply = `ifconfig $arg 2> /dev/null | grep -w "inet"` if $?;
         $reply = '' if $?;
+
     } elsif ($use eq 'cmd') {
         if ($arg) {
             $skip  = opt('cmd-skip', $h)  || '';
@@ -2376,8 +2378,8 @@ sub get_ip {
         $arg = $url;
 
         if ($url) {
-	        # when using a web server to find public IPv4 address we should force use of IPv4
-	        $reply = geturl(opt('proxy', $h), $url, undef, undef, undef, undef, undef, '4') || '';
+            # when using a web server to find public IPv4 address we should force use of IPv4
+            $reply = geturl(opt('proxy', $h), $url, undef, undef, undef, undef, undef, '4') || '';
         }
 
     } elsif (($use eq 'cisco')) {
@@ -2415,7 +2417,7 @@ sub get_ip {
         $arg   = $url;
 
     } elsif ($use eq 'no') {
-		$reply = '0.0.0.0';
+        $reply = '0.0.0.0';
 
     } else {
         $url  = opt('fw',      $h) || '';
@@ -2515,7 +2517,7 @@ sub get_ipv6 {
           $reply = '';
         }
     } else {
-		# We found IPv6 address from some method other than local interface
+        # We found IPv6 address from some method other than local interface
         # so extract IPv6 address from the text
         if ($reply =~ /(?i)(?<![:.\w])(?:[A-F0-9]{1,4}:){7}[A-F0-9]{1,4}(?![:.\w])/) {
         $ipv6 = $&;
@@ -2576,6 +2578,7 @@ sub group_hosts_by {
     }
     return %groups;
 }
+
 ######################################################################
 ## encode_www_form_urlencoded
 ######################################################################
