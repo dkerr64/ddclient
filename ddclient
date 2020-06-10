@@ -2140,7 +2140,7 @@ sub geturl {
     debug("protocol = %s", $use_ssl ? "https" : "http");
     debug("server   = %s", $server);
     debug("url      = %s", $url);
-    debug("ip ver = %s", $ipversion);
+    debug("ip ver   = %s", $ipversion);
 
     if ( (!opt('curl')) and ($ipversion ne '6') ) {
         # Access network using perl functions. Note that IPv6 must use curl.
@@ -2237,7 +2237,6 @@ sub geturl {
             }
         }
         $0 = sprintf("%s - closed %s port %s", $program, $peer, $port);
-
     } else
     {
         # Access network using cURL.  This is required for IPv6
@@ -3895,6 +3894,7 @@ sub nic_nfsn_gen_auth_header {
 
     my $hash = sha1_hex($hash_string);
     $auth_header .= $hash;
+    $auth_header .= "\n";
 
     return $auth_header;
 }
@@ -3912,7 +3912,7 @@ sub nic_nfsn_make_request {
     my $url      = $base_url . $path;
     my $header   = nic_nfsn_gen_auth_header($h, $path, $body);
     if ($method eq 'POST' && $body ne '') {
-        $header .= "\nContent-Type: application/x-www-form-urlencoded";
+        $header .= "Content-Type: application/x-www-form-urlencoded\n";
     }
 
     return geturl(opt('proxy'), $url, '', '', $header, $method, $body);
@@ -4717,10 +4717,10 @@ sub nic_cloudflare_update {
 
         my $headers = "Content-Type: application/json\n";
         if ($config{$key}{'login'} eq 'token') {
-            $headers .= "Authorization: Bearer $config{$key}{'password'}";
+            $headers .= "Authorization: Bearer $config{$key}{'password'}\n";
         } else {
             $headers .= "X-Auth-Email: $config{$key}{'login'}\n";
-            $headers .= "X-Auth-Key: $config{$key}{'password'}";
+            $headers .= "X-Auth-Key: $config{$key}{'password'}\n";
         }
 
         # FQDNs
@@ -4912,7 +4912,7 @@ sub nic_yandex_update {
         my @hosts   = @{$groups{$sig}};
         my $key     = $hosts[0];
         my $ip      = $config{$key}{'wantip'};
-        my $headers = 'PddToken: ' . $config{$key}{'password'};
+        my $headers = "PddToken: $config{$key}{'password'}\n";
 
         # FQDNs
         for my $host (@hosts) {
