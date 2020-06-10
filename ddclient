@@ -2469,13 +2469,6 @@ sub get_ipv6 {
         $reply = `ip -6 -o addr show dev $arg scope global 2>/dev/null | grep -v "deprecated"`;
         $reply = `ifconfig $arg 2>/dev/null | grep -w "inet6" | grep -v "deprecated"` if $?;
         $reply = '' if $?;
-        # Now filter for Global Unicast Address (GUA) as it would not be valid
-        # to try and update DNS with a link local or Unique Local (ULA) Address
-        if ($reply =~ /^.*? ([23][a-f0-9]{3}:[a-f0-9:]+:[a-f0-9]{1,4})[\/| ].*/is) {
-        $reply = $1;
-        } else {
-          $reply = '';
-        }
 
     }  elsif ($usev6 eq 'cmd') {
         $arg = opt('cmdv6', $h);
@@ -4170,7 +4163,7 @@ sub nic_freedns_update {
             # This little gem from http://home.deds.nl/~aeron/regex/
             if ($rec[1] =~ /^(((?=.*(::))(?!.*\3.+\3))\3?|([\dA-F]{1,4}(\3|:\b|$)|\2))(?4){5}((?4){2}|(((2[0-4]|1\d|[1-9])?\d|25[0-5])\.?\b){4})\z/ai) {
                 debug("Host: %s, IPv6: %s", $rec[0], $rec[1]);
-	        $freedns_hosts_ipv6{$rec[0]} = \@rec;
+                $freedns_hosts_ipv6{$rec[0]} = \@rec;
             } else {
                 debug("Host: %s, IPv4: %s", $rec[0], $rec[1]);
                 $freedns_hosts{$rec[0]} = \@rec;
