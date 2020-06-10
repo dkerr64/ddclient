@@ -77,7 +77,6 @@ my %builtinweb = (
     'ipifyipv6' => { 'url' => 'https://api6.ipify.org/', },
     'loopia'    => { 'url' => 'http://dns.loopia.se/checkip/checkip.php', 'skip' => 'Current IP Address:', },
     'myonlineportal' => { 'url' => 'https://myonlineportal.net/checkip', },
-    'dnspark'        => { 'url' => 'http://ipdetect.dnspark.com/', 'skip' => 'Current Address:', },
     'he'             => { 'url' => 'http://checkip.dns.he.net/', 'skip' => 'Your IP address is', }, 
     'whatismyv6'     => { 'url' => 'http://whatismyv6.com/', 'skip' => 'Address of:', },
     'nsupdate.info'  => { 'url' => 'https://ipv6.nsupdate.info/myip', , },
@@ -300,7 +299,7 @@ my %builtinfw = (
     },
 );
 my %ip_strategies = (
-    'no'                     => ": do not obtain an IPv4 address for this host",
+    'no'        => ": do not obtain an IPv4 address for this host",
     'ip'        => ": obtain IP from -ip {address}",
     'web'       => ": obtain IP from an IP discovery page on the web",
     'fw'        => ": obtain IP from the firewall specified by -fw {type|address}",
@@ -315,11 +314,11 @@ sub ip_strategies_usage {
 }
 
 my %ipv6_strategies = (
-     'no'                     => ": do not obtain an IPv6 address for this host",
-     'ip'                     => ": obtain IP from -ipv6 {address}",
-     'if'                     => ": obtain IP from the -if {interface}",
-     'cmd'                    => ": obtain IP from the -cmdv6 {external-command}",
-     'web'                    => ": obtain IP from an IP discovery page on the web"
+     'no'       => ": do not obtain an IPv6 address for this host",
+     'ip'       => ": obtain IP from -ipv6 {address}",
+     'if'       => ": obtain IP from the -if {interface}",
+     'cmd'      => ": obtain IP from the -cmdv6 {external-command}",
+     'web'      => ": obtain IP from an IP discovery page on the web"
 );
 sub ipv6_strategies_usage {
     return map { sprintf("    -usev6=%-22s %s.", $_, $ipv6_strategies{$_}) } sort keys %ipv6_strategies;
