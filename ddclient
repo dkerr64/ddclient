@@ -4788,7 +4788,7 @@ sub nic_cloudflare_update {
                 last if !header_ok($domain, $reply);
 
                 # Strip header
-               $reply =~ s/^.*?\n\n//s;
+                $reply =~ s/^.*?\n\n//s;
                 $response = eval {decode_json($reply)};
                 if (!defined $response || !defined $response->{result}) {
                     failed("invalid json or result.");
@@ -4999,48 +4999,86 @@ EoEXAMPLE
 ## by George Kranis (copypasta from nic_dtdns_update)
 ## http://www.duckdns.org/update?domains=mydomain1,mydomain2&token=xxxx-xxx-xx-x&ip=x.x.x.x
 ## response contains OK or KO
+##
+## IPv6 support added by astlinux-project
+##
 ######################################################################
 sub nic_duckdns_update {
     debug("\nnic_duckdns_update -------------------");
 
-    ## update each configured host
-    ## should improve to update in one pass
-    foreach my $h (@_) {
-        my $ip = delete $config{$h}{'wantip'};
-        info("setting IP address to %s for %s", $ip, $h);
-        verbose("UPDATE:", "updating %s", $h);
+    ## group hosts with identical attributes together
+    my %groups = group_hosts_by([@_], [qw(server password)]);
 
-        # Set the URL that we're going to to update
-        my $url;
-        $url  = "https://$config{$h}{'server'}/update";
-        $url .= "?domains=";
-        $url .= $h;
-        $url .= "&token=";
-        $url .= $config{$h}{'password'};
-        $url .= "&ip=";
-        $url .= $ip;
+    ## update each set of hosts that had similar configurations
+    foreach my $sig (keys %groups) {
+        my @hosts = @{$groups{$sig}};
+        my $key   = $hosts[0];
 
+        # FQDNs
+        for my $host (@hosts) {
+            my $ip    = delete $config{$host}{'wantip'};
+            my $ipv6  = delete $config{$host}{'wantipv6'};
 
-        # Try to get URL
-        my $reply = geturl(opt('proxy'), $url);
+            my $nq_host = $host;
+            $nq_host =~ s/\.duckdns\.org$//;
 
-        # No response, declare as failed
-        if (!defined($reply) || !$reply) {
-            failed("updating %s: Could not connect to %s.", $h, $config{$h}{'server'});
-            last;
-        }
-        last if !header_ok($h, $reply);
+            if (defined($ip)) {
+                info("setting IPv4 address to %s for %s", $ip, $host);
+                verbose("UPDATE:", "updating %s", $host);
 
-        my @reply = split /\n/, $reply;
-        my $returned = pop(@reply);
-        if ($returned =~ /OK/) {
-            $config{$h}{'ip'}     = $ip;
-            $config{$h}{'mtime'}  = $now;
-            $config{$h}{'status'} = 'good';
-            success("updating %s: good: IP address set to %s", $h, $ip);
-        } else {
-            $config{$h}{'status'} = 'failed';
-            failed("updating %s: Server said: '%s'", $h, $returned);
+                # Update the DNS 'A' record
+                my $url = "https://$config{$host}{'server'}/update";
+                $url .= "?domains=$nq_host";
+                $url .= "&token=$config{$host}{'password'}";
+                $url .= "&ip=$ip";
+
+                my $reply = geturl(opt('proxy'), $url);
+                if (!defined($reply) || !$reply) {
+                    failed("updating %s: Could not connect to %s.", $host, $config{$host}{'server'});
+                    last;
+                }
+
+                my @reply = split /\n/, $reply;
+                my $returned = pop(@reply);
+                if ($returned =~ /OK/) {
+                    success("updating %s: IPv4 address set to %s", $host, $ip);
+                    $config{$host}{'ip'}     = $ip;
+                    $config{$host}{'mtime'}  = $now;
+                    $config{$host}{'status'} = 'good';
+                } else {
+                    $config{$host}{'status'} = 'failed';
+                    failed("updating %s: unexpected status (%s)", $host, $returned);
+                }
+            }
+
+            if (defined($ipv6)) {
+                info("setting IPv6 address to %s for %s", $ipv6, $host);
+                verbose("UPDATE:", "updating %s", $host);
+
+                # Update the DNS 'AAAA' record
+                my $url = "https://$config{$host}{'server'}/update";
+                $url .= "?domains=$nq_host";
+                $url .= "&token=$config{$host}{'password'}";
+                $url .= "&ipv6=$ipv6";
+
+                my $reply = geturl(opt('proxy'), $url);
+                if (!defined($reply) || !$reply) {
+                    failed("updating %s: Could not connect to %s.", $host, $config{$host}{'server'});
+                    last;
+                }
+
+                my @reply = split /\n/, $reply;
+                my $returned = pop(@reply);
+                if ($returned =~ /OK/) {
+                    success("updating %s: IPv6 address set to %s", $host, $ipv6);
+                    $config{$host}{'ipv6'}        = $ipv6;
+                    $config{$host}{'mtime'}       = $now;
+                    $config{$host}{'status-ipv6'} = 'good';
+                } else {
+                    $config{$host}{'status-ipv6'} = 'failed';
+                    failed("updating %s: unexpected status (%s)", $host, $returned);
+                }
+            }
         }
     }
 }
