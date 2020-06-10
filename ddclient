@@ -970,7 +970,7 @@ sub runpostscript {
 sub update_nics {
     my %examined = ();
     my %iplist   = ();
-	my %ipv6list = ();
+    my %ipv6list = ();
 
     foreach my $s (sort keys %services) {
         my (@hosts, %ips, %ipsv6) = ();
@@ -981,15 +981,15 @@ sub update_nics {
             next if $config{$h}{'protocol'} ne lc($s);
             $examined{$h} = 1;
             # we only do this once per 'use' and argument combination
-            my $use     = opt('use', $h);
-            my $usev6 = opt('usev6', $h);
-            my $arg_ip  = opt('ip',  $h) || '';
-            my $arg_ipv6 = opt('ipv6', $h) || '';
-            my $arg_fw  = opt('fw',  $h) || '';
-            my $arg_if  = opt('if',  $h) || '';
-            my $arg_web = opt('web', $h) || '';
+            my $use       = opt('use',   $h);
+            my $usev6     = opt('usev6', $h);
+            my $arg_ip    = opt('ip',    $h) || '';
+            my $arg_ipv6  = opt('ipv6',  $h) || '';
+            my $arg_fw    = opt('fw',    $h) || '';
+            my $arg_if    = opt('if',    $h) || '';
+            my $arg_web   = opt('web',   $h) || '';
             my $arg_webv6 = opt('webv6', $h) || '';
-            my $arg_cmd = opt('cmd', $h) || '';
+            my $arg_cmd   = opt('cmd',   $h) || '';
             my $arg_cmdv6 = opt('cmdv6', $h) || '';
             my $ip = "";
             my $ipv6 = "";
@@ -999,7 +999,7 @@ sub update_nics {
                 $ip = get_ip($use, $h);
                 if (!defined $ip || !$ip) {
                     warning("%s: unable to determine IPv4 address with strategy use=%s", $h, $use)
-                    if !$daemon || opt('verbose');
+                      if !$daemon || opt('verbose');
                 } elsif ($ip !~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/) {
                     warning("%s: malformed IPv4 address (%s)", $h, $ip);
                 } else {
@@ -1009,31 +1009,31 @@ sub update_nics {
             }
             $config{$h}{'wantip'} = $ip;
             if (defined($usev6)) {
-            if (exists $ipv6list{$usev6}{$arg_ipv6}{$arg_fw}{$arg_if}{$arg_webv6}{$arg_cmdv6}) {
-                $ipv6 = $ipv6list{$usev6}{$arg_ipv6}{$arg_fw}{$arg_if}{$arg_webv6}{$arg_cmdv6};
-            } else {
-                $ipv6 = get_ipv6($usev6, $h);
-                if (!defined $ipv6 || !$ipv6) {
-                    warning("%s: unable to determine IPv6 address with strategy usev6=%s", $h, $usev6)
-                    if !$daemon || opt('verbose');
-                        } elsif ($ipv6 !~ /^(((?=.*(::))(?!.*\3.+\3))\3?|([\dA-F]{1,4}(\3|:\b|$)|\2))(?4){5}((?4){2}|(((2[0-4]|1\d|[1-9])?\d|25[0-5])\.?\b){4})\z/ai) {
-                            # That little gem from http://home.deds.nl/~aeron/regex/
-                            warning("%s: malformed IPv6 address (%s)", $h, $ipv6);
-                        } else {
-                            $ipv6list{$usev6}{$arg_ipv6}{$arg_fw}{$arg_if}{$arg_webv6}{$arg_cmdv6} = $ipv6;
-                        }
-                        debug("IPv6 %s", define($ipv6, "<undefined>"));
+                if (exists $ipv6list{$usev6}{$arg_ipv6}{$arg_fw}{$arg_if}{$arg_webv6}{$arg_cmdv6}) {
+                    $ipv6 = $ipv6list{$usev6}{$arg_ipv6}{$arg_fw}{$arg_if}{$arg_webv6}{$arg_cmdv6};
+                } else {
+                    $ipv6 = get_ipv6($usev6, $h);
+                    if (!defined $ipv6 || !$ipv6) {
+                        warning("%s: unable to determine IPv6 address with strategy usev6=%s", $h, $usev6)
+                          if !$daemon || opt('verbose');
+                    } elsif ($ipv6 !~ /^(((?=.*(::))(?!.*\3.+\3))\3?|([\dA-F]{1,4}(\3|:\b|$)|\2))(?4){5}((?4){2}|(((2[0-4]|1\d|[1-9])?\d|25[0-5])\.?\b){4})\z/ai) {
+                        # That little gem from http://home.deds.nl/~aeron/regex/
+                        warning("%s: malformed IPv6 address (%s)", $h, $ipv6);
+                    } else {
+                        $ipv6list{$usev6}{$arg_ipv6}{$arg_fw}{$arg_if}{$arg_webv6}{$arg_cmdv6} = $ipv6;
                     }
-                    $config{$h}{'wantipv6'} = $ipv6;
+                    debug("IPv6 %s", define($ipv6, "<undefined>"));
                 }
-                next if !nic_updateable($h, $updateable);
-                push @hosts, $h;
-                $ips{$ip} = $h if (defined($ip));
-                $ipsv6{$ipv6} = $h if (defined($ipv6));
+                $config{$h}{'wantipv6'} = $ipv6;
             }
-            if (@hosts) {
-                $0 = sprintf("%s - updating %s", $program, join(',', @hosts));
-                &$update(@hosts);
+            next if !nic_updateable($h, $updateable);
+            push @hosts, $h;
+            $ips{$ip} = $h if (defined($ip));
+            $ipsv6{$ipv6} = $h if (defined($ipv6));
+        }
+        if (@hosts) {
+            $0 = sprintf("%s - updating %s", $program, join(',', @hosts));
+            &$update(@hosts);
             runpostscript(join ' ', keys %ips, keys %ipsv6);
         }
     }
@@ -1046,6 +1046,7 @@ sub update_nics {
     }
     write_cache(opt('cache'));
 }
+
 ######################################################################
 ## unlink_pid()
 ######################################################################
