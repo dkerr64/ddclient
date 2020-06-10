@@ -77,10 +77,10 @@ my %builtinweb = (
     'ipifyipv6' => { 'url' => 'https://api6.ipify.org/', },
     'loopia'    => { 'url' => 'http://dns.loopia.se/checkip/checkip.php', 'skip' => 'Current IP Address:', },
     'myonlineportal' => { 'url' => 'https://myonlineportal.net/checkip', },
+    'dnspark'        => { 'url' => 'http://ipdetect.dnspark.com/', 'skip' => 'Current Address:', },
+    'he'             => { 'url' => 'http://checkip.dns.he.net/', 'skip' => 'Your IP address is', }, 
     'whatismyv6'     => { 'url' => 'http://whatismyv6.com/', 'skip' => 'Address of:', },
     'nsupdate.info'  => { 'url' => 'https://ipv6.nsupdate.info/myip', , },
-    'dnspark'        => { 'url' => 'http://ipdetect.dnspark.com/', 'skip' => 'Current Address:', },
-    'he'             => { 'url' => 'http://checkip.dns.he.net/', 'skip' => 'Your IP address is', },
 );
 my %builtinfw = (
     'watchguard-soho' => {
@@ -485,6 +485,8 @@ my %variables = (
         'server'              => setv(T_FQDNP,  1, 0, 1, 'www.duckdns.org',   undef),
         'login'               => setv(T_LOGIN,  0, 0, 0, 'unused',            undef),
     },
+    'he-common-defaults' => {
+        'server' => setv(T_FQDNP, 1, 0, 1, 'dyn.dns.he.net', undef),
     'freemyip-common-defaults' => {
         'server'              => setv(T_FQDNP,  1, 0, 1, 'freemyip.com',      undef),
         'login'               => setv(T_LOGIN,  0, 0, 0, 'unused',            undef),
@@ -699,6 +701,16 @@ my %services = (
         'examples'   => \&nic_duckdns_examples,
         'variables'  => merge(
             $variables{'duckdns-common-defaults'},
+            $variables{'service-common-defaults'},
+        ),
+    },
+    'he' => {
+        'updateable' => undef,
+        'update'     => \&nic_he_update,
+        'examples'   => \&nic_he_examples,
+        'variables'  => merge(
+            {'min-interval' => setv(T_DELAY, 0, 0, 1, interval('5m'), 0),},
+            $variables{'he-common-defaults'},
             $variables{'service-common-defaults'},
         ),
     },
@@ -4744,7 +4756,7 @@ sub nic_cloudflare_update {
                 failed("updating %s: No zone ID found.", $config{$key}{'zone'});
                 next;
             }
-            info("zone ID is %s", $zone_id);
+            info("Zone ID is %s", $zone_id);
 
             if (defined($ip)) {
                 info("setting IPv4 address to %s for %s", $ip, $domain);
@@ -5082,6 +5094,159 @@ sub nic_duckdns_update {
         }
     }
 }
+######################################################################
+## nic_he_examples
+##
+## written by the AstLinux Project
+##
+######################################################################
+sub nic_he_examples {
+    return "<<EoEXAMPLE";
+o 'he'
+
+The 'he' protocol is the protocol used by the free dynamic
+DNS service offered by Hurricane Electric at https://dns.he.net
+
+Configuration variables applicable to the 'he' protocol are:
+  protocol=he                  ##
+  login=fully.qualified.host   ## the fully qualified hostname
+  password=my-genereated-key   ## the password provided by the admin interface
+  fully.qualified.host         ## the fully qualified hostname
+
+Example ${program}.conf file entries:
+  ## single host update
+  protocol=he,                                      \\
+  login=fully.qualified.host,                       \\
+  password=my-genereated-key                        \\
+  fully.qualified.host
+EoEXAMPLE
+}
+
+######################################################################
+## nic_he_update
+######################################################################
+sub nic_he_update {
+    debug("\nnic_he_update -------------------");
+
+    ## group hosts with identical attributes together
+    my %groups = group_hosts_by([@_], [qw(server login password)]);
+
+    my %errors = (
+        'badauth'  => 'Invalid username or password',
+        'badagent' => 'Invalid user agent',
+        'nohost'   => 'The hostname specified does not exist in the database',
+        '!donator' => 'The offline setting was set, when the user is not a donator',
+        'abuse',   => 'The hostname specified is blocked for abuse',
+        'numhost'  => 'System error: Too many or too few hosts found',
+        'dnserr'   => 'System error: DNS error encountered',
+        'interval' => 'The update interval has been exceeded, wait and try again later',
+        'noipv4'   => 'No DNS "A" record exists, add one and make it dynamic',
+        'noipv6'   => 'No DNS "AAAA" record exists, add one and make it dynamic',
+        'nochg'    => 'Unnecessary update attempts are considered abusive',
+    );
+
+    ## update each set of hosts that had similar configurations
+    foreach my $sig (keys %groups) {
+        my @hosts = @{$groups{$sig}};
+        my $key   = $hosts[0];
+
+        # FQDNs
+        for my $host (@hosts) {
+            my $ip    = delete $config{$host}{'wantip'};
+            my $ipv6  = delete $config{$host}{'wantipv6'};
+
+            if (defined($ip)) {
+                info("setting IPv4 address to %s for %s", $ip, $host);
+                verbose("UPDATE:", "updating %s", $host);
+
+                # Update the DNS 'A' record
+                my $url = "https://$config{$host}{'server'}/nic/update";
+                $url .= "?hostname=$host";
+                $url .= "&password=$config{$host}{'password'}";
+                $url .= "&myip=";
+                $url .= $ip if $ip;
+
+                my $reply = geturl(opt('proxy'), $url);
+                if (!defined($reply) || !$reply) {
+                    failed("updating %s: Could not connect to %s.", $host, $config{$host}{'server'});
+                    last;
+                }
+
+                my @reply = split /\n/, $reply;
+                foreach my $line (@reply) {
+                    my ($status, $ip_ignore) = split / /, lc $line;
+
+                    $config{$host}{'status'} = $status;
+                    if ($status eq 'good') {
+                        success("updating %s: IPv4 address set to %s", $host, $ip);
+                        $config{$host}{'ip'}    = $ip;
+                        $config{$host}{'mtime'} = $now;
+
+                    } elsif (exists $errors{$status}) {
+                        if (($status eq 'nochg') || ($status eq 'interval')) {
+                            warning("updating %s: No DNS 'A' record update required; %s", $host, $errors{$status});
+                            $config{$host}{'ip'}     = $ip;
+                            $config{$host}{'mtime'}  = $now;
+                            $config{$host}{'status'} = 'good';
+
+                        } else {
+                            failed("updating %s: %s: %s", $host, $status, $errors{$status});
+                        }
+                    } elsif ($status =~ /w(\d+)(.)/) {
+                        warning("updating %s: %s: ignoring wait result", $host, $status);
+                    } else {
+                        failed("updating %s: unexpected status (%s)", $host, $line);
+                    }
+                }
+            }
+
+            if (defined($ipv6)) {
+                info("setting IPv6 address to %s for %s", $ipv6, $host);
+                verbose("UPDATE:", "updating %s", $host);
+
+                # Update the DNS 'AAAA' record
+                my $url = "https://$config{$host}{'server'}/nic/update";
+                $url .= "?hostname=$host";
+                $url .= "&password=$config{$host}{'password'}";
+                $url .= "&myip=";
+                $url .= $ipv6 if $ipv6;
+
+                my $reply = geturl(opt('proxy'), $url);
+                if (!defined($reply) || !$reply) {
+                    failed("updating %s: Could not connect to %s.", $host, $config{$host}{'server'});
+                    last;
+                }
+
+                my @reply = split /\n/, $reply;
+                foreach my $line (@reply) {
+                    my ($status, $ipv6_ignore) = split / /, lc $line;
+
+                    $config{$host}{'status-ipv6'} = $status;
+                    if ($status eq 'good') {
+                        success("updating %s: IPv6 address set to %s", $host, $ipv6);
+                        $config{$host}{'ipv6'}  = $ipv6;
+                        $config{$host}{'mtime'} = $now;
+
+                    } elsif (exists $errors{$status}) {
+                        if (($status eq 'nochg') || ($status eq 'interval')) {
+                            warning("updating %s: No DNS 'AAAA' record update required; %s", $host, $errors{$status});
+                            $config{$host}{'ipv6'}        = $ipv6;
+                            $config{$host}{'mtime'}       = $now;
+                            $config{$host}{'status-ipv6'} = 'good';
+
+                        } else {
+                            failed("updating %s: %s: %s", $host, $status, $errors{$status});
+                        }
+                    } elsif ($status =~ /w(\d+)(.)/) {
+                        warning("updating %s: %s: ignoring wait result", $host, $status);
+                    } else {
+                        failed("updating %s: unexpected status (%s)", $host, $line);
+                    }
+                }
+            }
+        }
+    }
+}
 
 ######################################################################
 ## nic_freemyip_examples
@@ -5352,7 +5517,7 @@ EoEXAMPLE
 ######################################################################
 
 sub nic_dondominio_update {
-    debug("\nnic_duckdns_update -------------------");
+    debug("\nnic_dondominio_update -------------------");
 
     ## update each configured host
     ## should improve to update in one pass
