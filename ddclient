@@ -1604,9 +1604,15 @@ sub test_possible_ip {
     printf "use=ip, ipv6=%s address is %s\n", opt('ipv6'), define(get_ipv6('ip'), 'NOT FOUND')
     if defined opt('ipv6');
     {
-        local $opt{'use'} = 'if';
-        foreach my $if (grep {/^[a-zA-Z]/} `ifconfig -a`) {
-            $if =~ s/:?\s.*//is;
+        # Note: The `ip` command adds a `@eth0` suffix to the names of VLAN
+        # interfaces. That `@eth0` suffix is NOT part of the interface name.
+        my @ifs = map({ /^[^\s:]*:\s*([^\s:@]+)/ ? $1 : () }
+                      `command -v ip >/dev/null && ip -o link show`);
+        @ifs = map({ /^([a-zA-Z].*?)(?::?\s.*)?$/ ? $1 : () }
+                   `command -v ifconfig >/dev/null && ifconfig -a`) if $? || !@ifs;
+        @ifs = () if $?;
+        warning("failed to get list of interfaces") if !@ifs;
+        foreach my $if (@ifs) {
             local $opt{'if'} = $if;
             printf "use=if, ifv6=%s address is %s\n", opt('if'), define(get_ipv6('if'), 'NOT FOUND');
         }
@@ -2488,8 +2494,8 @@ sub get_ipv6 {
 
     } elsif ($usev6 eq 'if') {
         $skip  = opt('ifv6-skip', $h)  || '';
-        $reply = `ip -6 -o addr show dev $arg scope global 2>/dev/null | grep -v "deprecated" | grep -v "temporary"`;
-        $reply = `ifconfig $arg 2>/dev/null | grep -w "inet6" | grep -v "deprecated" | grep -v "temporary"` if $?;
+        $reply = `command -v ip >/dev/null && ip -6 -o addr show dev $arg scope global 2>/dev/null | grep -v "deprecated" | grep -v "temporary"`;
+        $reply = `command -v ifconfig >/dev/null && ifconfig $arg 2>/dev/null | grep -w "inet6" | grep -v "deprecated" | grep -v "temporary"` if $?;
         $reply = '' if $?;
 
     }  elsif ($usev6 eq 'cmd') {
