@@ -18,7 +18,7 @@
 #
 #
 ######################################################################
-require v5.8.0;
+require v5.10.1;
 use strict;
 use warnings;
 use Getopt::Long;
@@ -298,6 +298,7 @@ my %builtinfw = (
         'skip' => 'Internet IP Address',
     },
 );
+
 my %ip_strategies = (
     'no'        => ": do not obtain an IPv4 address for this host",
     'ip'        => ": obtain IP from -ip {address}",
@@ -309,6 +310,7 @@ my %ip_strategies = (
     'cisco-asa' => ": obtain IP from Cisco ASA at the -fw {address}",
     map { $_ => sprintf ": obtain IP from %s at the -fw {address}", $builtinfw{$_}->{'name'} } keys %builtinfw,
 );
+
 sub ip_strategies_usage {
     return map { sprintf("    -use=%-22s %s.", $_, $ip_strategies{$_}) } sort keys %ip_strategies;
 }
@@ -387,10 +389,10 @@ my %variables = (
         'postscript'          => setv(T_POSTS, 0, 0, 1, '',                   undef),
     },
     'service-common-defaults' => {
-        'server'              => setv(T_FQDNP,  1, 0, 1, 'members.dyndns.org', undef),
-        'login'               => setv(T_LOGIN,  1, 0, 1, '',                  undef),
-        'password'            => setv(T_PASSWD, 1, 0, 1, '',                  undef),
-        'host'                => setv(T_STRING, 1, 1, 1, '',                  undef),
+        'server'              => setv(T_FQDNP, 1, 0, 1, 'members.dyndns.org', undef),
+        'login'               => setv(T_LOGIN, 1, 0, 1, '',                   undef),
+        'password'            => setv(T_PASSWD,1, 0, 1, '',                   undef),
+        'host'                => setv(T_STRING,1, 1, 1, '',                   undef),
 
         'use'                 => setv(T_USE,   0, 0, 1, 'ip',                 undef),
         'usev6'               => setv(T_USEV6, 0, 0, 1, undef,                undef),
@@ -412,122 +414,122 @@ my %variables = (
         'cmdv6-skip'          => setv(T_STRING,0, 0, 1, '',                   undef),
         'ip'                  => setv(T_IP,     0, 1, 0, undef,               undef),
         'ipv6'                => setv(T_IPV6,   0, 1, 0, undef,               undef),
-        'wtime'               => setv(T_DELAY,  0, 1, 1, 0,                   interval('30s')),
-        'mtime'               => setv(T_NUMBER, 0, 1, 0, 0,                   undef),
-        'atime'               => setv(T_NUMBER, 0, 1, 0, 0,                   undef),
-        'status'              => setv(T_ANY,    0, 1, 0, '',                  undef),
+        'wtime'               => setv(T_DELAY, 0, 1, 1, 0,                    interval('30s')),
+        'mtime'               => setv(T_NUMBER,0, 1, 0, 0,                    undef),
+        'atime'               => setv(T_NUMBER,0, 1, 0, 0,                    undef),
+        'status'              => setv(T_ANY,   0, 1, 0, '',                   undef),
         'status-ipv6'         => setv(T_ANY,    0, 1, 0, '',              undef),
-        'min-interval'        => setv(T_DELAY,  0, 0, 1, interval('30s'),     0),
-        'max-interval'        => setv(T_DELAY,  0, 0, 1, interval('25d'),     0),
-        'min-error-interval'  => setv(T_DELAY,  0, 0, 1, interval('5m'),      0),
+        'min-interval'        => setv(T_DELAY, 0, 0, 1, interval('30s'),      0),
+        'max-interval'        => setv(T_DELAY, 0, 0, 1, interval('25d'),      0),
+        'min-error-interval'  => setv(T_DELAY, 0, 0, 1, interval('5m'),       0),
 
-        'warned-min-interval'       => setv(T_ANY,    0, 1, 0, 0,             undef),
-        'warned-min-error-interval' => setv(T_ANY,    0, 1, 0, 0,             undef),
+        'warned-min-interval'       => setv(T_ANY, 0, 1, 0, 0,                undef),
+        'warned-min-error-interval' => setv(T_ANY, 0, 1, 0, 0,                undef),
     },
     'dyndns-common-defaults' => {
-        'static'              => setv(T_BOOL,   0, 1, 1, 0,                   undef),
-        'wildcard'            => setv(T_BOOL,   0, 1, 1, 0,                   undef),
-        'mx'                  => setv(T_OFQDN,  0, 1, 1, '',                  undef),
-        'backupmx'            => setv(T_BOOL,   0, 1, 1, 0,                   undef),
+        'static'              => setv(T_BOOL,  0, 1, 1, 0,                    undef),
+        'wildcard'            => setv(T_BOOL,  0, 1, 1, 0,                    undef),
+        'mx'                  => setv(T_OFQDN, 0, 1, 1, '',                   undef),
+        'backupmx'            => setv(T_BOOL,  0, 1, 1, 0,                    undef),
     },
     'easydns-common-defaults' => {
-        'wildcard'            => setv(T_BOOL,   0, 1, 1, 0,                   undef),
-        'mx'                  => setv(T_OFQDN,  0, 1, 1, '',                  undef),
-        'backupmx'            => setv(T_BOOL,   0, 1, 1, 0,                   undef),
+        'wildcard'            => setv(T_BOOL,  0, 1, 1, 0,                    undef),
+        'mx'                  => setv(T_OFQDN, 0, 1, 1, '',                   undef),
+        'backupmx'            => setv(T_BOOL,  0, 1, 1, 0,                    undef),
     },
     'noip-common-defaults' => {
-        'static'              => setv(T_BOOL,   0, 1, 1, 0,                   undef),
+        'static'              => setv(T_BOOL,  0, 1, 1, 0,                    undef),
     },
     'noip-service-common-defaults' => {
-        'server'              => setv(T_FQDNP,  1, 0, 1, 'dynupdate.no-ip.com', undef),
-        'login'               => setv(T_LOGIN,  1, 0, 1, '',                  undef),
-        'password'            => setv(T_PASSWD, 1, 0, 1, '',                  undef),
-        'host'                => setv(T_STRING, 1, 1, 1, '',                  undef),
-        'ip'                  => setv(T_IP,     0, 1, 0, undef,               undef),
+        'server'              => setv(T_FQDNP, 1, 0, 1, 'dynupdate.no-ip.com',undef),
+        'login'               => setv(T_LOGIN, 1, 0, 1, '',                   undef),
+        'password'            => setv(T_PASSWD,1, 0, 1, '',                   undef),
+        'host'                => setv(T_STRING,1, 1, 1, '',                   undef),
+        'ip'                  => setv(T_IP,    0, 1, 0, undef,                undef),
         'ipv6'                => setv(T_IPV6,   0, 1, 0, undef,               undef),
-        'wtime'               => setv(T_DELAY,  0, 1, 1, 0,                   interval('30s')),
-        'mtime'               => setv(T_NUMBER, 0, 1, 0, 0,                   undef),
-        'atime'               => setv(T_NUMBER, 0, 1, 0, 0,                   undef),
-        'status'              => setv(T_ANY,    0, 1, 0, '',                  undef),
-        'min-interval'        => setv(T_DELAY,  0, 0, 1, interval('30s'),     0),
-        'max-interval'        => setv(T_DELAY,  0, 0, 1, interval('25d'),     0),
-        'min-error-interval'  => setv(T_DELAY,  0, 0, 1, interval('5m'),      0),
-        'warned-min-interval'       => setv(T_ANY,    0, 1, 0, 0,             undef),
-        'warned-min-error-interval' => setv(T_ANY,    0, 1, 0, 0,             undef),
+        'wtime'               => setv(T_DELAY, 0, 1, 1, 0,                    interval('30s')),
+        'mtime'               => setv(T_NUMBER,0, 1, 0, 0,                    undef),
+        'atime'               => setv(T_NUMBER,0, 1, 0, 0,                    undef),
+        'status'              => setv(T_ANY,   0, 1, 0, '',                   undef),
+        'min-interval'        => setv(T_DELAY, 0, 0, 1, interval('30s'),      0),
+        'max-interval'        => setv(T_DELAY, 0, 0, 1, interval('25d'),      0),
+        'min-error-interval'  => setv(T_DELAY, 0, 0, 1, interval('5m'),       0),
+        'warned-min-interval'       => setv(T_ANY, 0, 1, 0, 0,                undef),
+        'warned-min-error-interval' => setv(T_ANY, 0, 1, 0, 0,                undef),
     },
     'zoneedit-service-common-defaults' => {
-        'zone'                => setv(T_OFQDN,  0, 0, 1, undef,               undef),
+        'zone'                => setv(T_OFQDN, 0, 0, 1, undef,                undef),
     },
     'dtdns-common-defaults' => {
-        'login'               => setv(T_LOGIN,  0, 0, 0, 'unused',            undef),
-        'client'              => setv(T_STRING, 0, 1, 1, $program,            undef),
+        'login'               => setv(T_LOGIN, 0, 0, 0, 'unused',             undef),
+        'client'              => setv(T_STRING,0, 1, 1, $program,             undef),
     },
     'nsupdate-common-defaults' => {
-        'ttl'                 => setv(T_NUMBER, 0, 1, 0, 600,                 undef),
-        'zone'                => setv(T_STRING, 1, 1, 1, '',                  undef),
-        'tcp'                 => setv(T_BOOL,   0, 1, 1, 0,                   undef),
+        'ttl'                 => setv(T_NUMBER,0, 1, 0, 600,                  undef),
+        'zone'                => setv(T_STRING,1, 1, 1, '',                   undef),
+        'tcp'                 => setv(T_BOOL,  0, 1, 1, 0,                    undef),
     },
     'cloudflare-common-defaults' => {
-        'server'              => setv(T_FQDNP,  1, 0, 1, 'api.cloudflare.com/client/v4', undef),
-        'zone'                => setv(T_FQDN,   1, 0, 1, '',                  undef),
-        'login'               => setv(T_LOGIN,  0, 0, 1, 'token',             undef),
-        'static'              => setv(T_BOOL,   0, 1, 1, 0,                   undef),
-        'wildcard'            => setv(T_BOOL,   0, 1, 1, 0,                   undef),
-        'mx'                  => setv(T_OFQDN,  0, 1, 1, '',                  undef),
-        'backupmx'            => setv(T_BOOL,   0, 1, 1, 0,                   undef),
-        'ttl'                 => setv(T_NUMBER, 1, 0, 1, 1,                   undef),
+        'server'              => setv(T_FQDNP, 1, 0, 1, 'api.cloudflare.com/client/v4', undef),
+        'zone'                => setv(T_FQDN,  1, 0, 1, '',                   undef),
+        'login'               => setv(T_LOGIN, 0, 0, 1, 'token',              undef),
+        'static'              => setv(T_BOOL,  0, 1, 1, 0,                    undef),
+        'wildcard'            => setv(T_BOOL,  0, 1, 1, 0,                    undef),
+        'mx'                  => setv(T_OFQDN, 0, 1, 1, '',                   undef),
+        'backupmx'            => setv(T_BOOL,  0, 1, 1, 0,                    undef),
+        'ttl'                 => setv(T_NUMBER,1, 0, 1, 1,                    undef),
     },
     'googledomains-common-defaults' => {
-        'server'              => setv(T_FQDNP,  1, 0, 1, 'domains.google.com', undef),
+        'server'              => setv(T_FQDNP, 1, 0, 1, 'domains.google.com', undef),
     },
     'duckdns-common-defaults' => {
-        'server'              => setv(T_FQDNP,  1, 0, 1, 'www.duckdns.org',   undef),
-        'login'               => setv(T_LOGIN,  0, 0, 0, 'unused',            undef),
+        'server'              => setv(T_FQDNP, 1, 0, 1, 'www.duckdns.org',    undef),
+        'login'               => setv(T_LOGIN, 0, 0, 0, 'unused',             undef),
     },
     'he-common-defaults' => {
         'server' => setv(T_FQDNP, 1, 0, 1, 'dyn.dns.he.net', undef),
     'freemyip-common-defaults' => {
-        'server'              => setv(T_FQDNP,  1, 0, 1, 'freemyip.com',      undef),
-        'login'               => setv(T_LOGIN,  0, 0, 0, 'unused',            undef),
+        'server'              => setv(T_FQDNP, 1, 0, 1, 'freemyip.com',       undef),
+        'login'               => setv(T_LOGIN, 0, 0, 0, 'unused',             undef),
     },
     'woima-common-defaults' => {
-        'static'              => setv(T_BOOL,   0, 1, 1, 0,                   undef),
-        'wildcard'            => setv(T_BOOL,   0, 1, 1, 0,                   undef),
-        'mx'                  => setv(T_OFQDN,  0, 1, 1, '',                  undef),
-        'backupmx'            => setv(T_BOOL,   0, 1, 1, 0,                   undef),
-        'custom'              => setv(T_BOOL,   0, 1, 1, 0,                   undef),
-        'script'              => setv(T_STRING, 1, 1, 1, '/nic/update',       undef),
+        'static'              => setv(T_BOOL,  0, 1, 1, 0,                    undef),
+        'wildcard'            => setv(T_BOOL,  0, 1, 1, 0,                    undef),
+        'mx'                  => setv(T_OFQDN, 0, 1, 1, '',                   undef),
+        'backupmx'            => setv(T_BOOL,  0, 1, 1, 0,                    undef),
+        'custom'              => setv(T_BOOL,  0, 1, 1, 0,                    undef),
+        'script'              => setv(T_STRING,1, 1, 1, '/nic/update',        undef),
     },
     'woima-service-common-defaults' => {
-        'server'              => setv(T_FQDNP,  1, 0, 1, 'dyn.woima.fi',      undef),
-        'login'               => setv(T_LOGIN,  1, 0, 1, '',                  undef),
-        'password'            => setv(T_PASSWD, 1, 0, 1, '',                  undef),
-        'ip'                  => setv(T_IP,     0, 1, 0, undef,               undef),
-        'wtime'               => setv(T_DELAY,  0, 1, 1, 0,                   interval('30s')),
-        'mtime'               => setv(T_NUMBER, 0, 1, 0, 0,                   undef),
-        'atime'               => setv(T_NUMBER, 0, 1, 0, 0,                   undef),
-        'status'              => setv(T_ANY,    0, 1, 0, '',                  undef),
-        'min-interval'        => setv(T_DELAY,  0, 0, 1, interval('30s'),     0),
-        'max-interval'        => setv(T_DELAY,  0, 0, 1, interval('25d'),     0),
-        'min-error-interval'  => setv(T_DELAY,  0, 0, 1, interval('5m'),      0),
-        'warned-min-interval'       => setv(T_ANY,    0, 1, 0, 0,             undef),
-        'warned-min-error-interval' => setv(T_ANY,    0, 1, 0, 0,             undef),
+        'server'              => setv(T_FQDNP, 1, 0, 1, 'dyn.woima.fi',       undef),
+        'login'               => setv(T_LOGIN, 1, 0, 1, '',                   undef),
+        'password'            => setv(T_PASSWD,1, 0, 1, '',                   undef),
+        'ip'                  => setv(T_IP,    0, 1, 0, undef,                undef),
+        'wtime'               => setv(T_DELAY, 0, 1, 1, 0,                    interval('30s')),
+        'mtime'               => setv(T_NUMBER,0, 1, 0, 0,                    undef),
+        'atime'               => setv(T_NUMBER,0, 1, 0, 0,                    undef),
+        'status'              => setv(T_ANY,   0, 1, 0, '',                   undef),
+        'min-interval'        => setv(T_DELAY, 0, 0, 1, interval('30s'),      0),
+        'max-interval'        => setv(T_DELAY, 0, 0, 1, interval('25d'),      0),
+        'min-error-interval'  => setv(T_DELAY, 0, 0, 1, interval('5m'),       0),
+        'warned-min-interval'       => setv(T_ANY, 0, 1, 0, 0,                undef),
+        'warned-min-error-interval' => setv(T_ANY, 0, 1, 0, 0,                undef),
     },
     'yandex-common-defaults' => {
-        'server'              => setv(T_FQDNP,  1, 0, 1, 'pddimp.yandex.ru',  undef),
+        'server'              => setv(T_FQDNP, 1, 0, 1, 'pddimp.yandex.ru',   undef),
     },
     'dnsmadeeasy-common-defaults' => {
-        'server'              => setv(T_FQDNP,  1, 0, 1, 'cp.dnsmadeeasy.com', undef),
-        'script'              => setv(T_STRING, 1, 1, 1, '/servlet/updateip', undef),
+        'server'              => setv(T_FQDNP, 1, 0, 1, 'cp.dnsmadeeasy.com', undef),
+        'script'              => setv(T_STRING,1, 1, 1, '/servlet/updateip',  undef),
     },
     'dondominio-common-defaults' => {
-        'server'              => setv(T_FQDNP,  1, 0, 1, 'dondns.dondominio.com', undef),
+        'server'              => setv(T_FQDNP, 1, 0, 1, 'dondns.dondominio.com', undef),
     },
     'ovh-common-defaults' => {
-        'server'              => setv(T_FQDNP,  1, 0, 1, 'www.ovh.com',       undef),
-        'script'              => setv(T_STRING, 1, 1, 1, '/nic/update',       undef),
-        'login'               => setv(T_LOGIN,  1, 0, 1, '',                  undef),
-        'password'            => setv(T_PASSWD, 1, 0, 1, '',                  undef),
+        'server'              => setv(T_FQDNP, 1, 0, 1, 'www.ovh.com',        undef),
+        'script'              => setv(T_STRING,1, 1, 1, '/nic/update',        undef),
+        'login'               => setv(T_LOGIN, 1, 0, 1, '',                   undef),
+        'password'            => setv(T_PASSWD,1, 0, 1, '',                   undef),
     },
 );
 my %services = (
@@ -799,8 +801,8 @@ my @opt = (
     [ "ipv6",        "=s", "-ipv6 address         : set the IPv6 address to 'address'" ],
     "",
     [ "if",          "=s", "-if interface         : obtain IP address from 'interface'" ],
-    [ "if-skip",     "=s", "-if-skip pattern      : skip any IP addresses before 'pattern' in the output of ip or ifconfig {if}" ],
-    [ "ifv6-skip",   "=s", "-ifv6-skip pattern    : skip any IPv6 addresses before 'pattern' in the output of ip or ifconfig {if}" ],
+    [ "if-skip",     "=s", "-if-skip pattern      : skip any IP addresses before 'pattern' in the output of 'ip address show dev {if}' (or 'ifconfig {if}')" ],
+    [ "ifv6-skip",   "=s", "-ifv6-skip pattern    : skip any IPv6 addresses before 'pattern' in the output of 'ip address show dev {if}' (or 'ifconfig {if}')" ],
     "",
     [ "web",         "=s", "-web provider|url     : obtain IP address from provider's IP checking page" ],
     [ "web-skip",    "=s", "-web-skip pattern     : skip any IP addresses before 'pattern' on the web provider|url" ],
@@ -1051,8 +1053,7 @@ sub update_nics {
     foreach my $h (sort keys %config) {
         if (!exists $examined{$h}) {
             failed("%s was not updated because protocol %s is not supported.",
-                   $h, define($config{$h}{'protocol'}, '<undefined>')
-            );
+                   $h, define($config{$h}{'protocol'}, '<undefined>'));
         }
     }
     write_cache(opt('cache'));
@@ -1370,9 +1371,11 @@ sub init_config {
     $opt{'quiet'} = 0 if opt('verbose');
 
     ## infer the IP strategy if possible
-    $opt{'use'} = 'ip'  if !define($opt{'use'}) && defined($opt{'ip'});
-    $opt{'use'} = 'if'  if !define($opt{'use'}) && defined($opt{'if'});
-    $opt{'use'} = 'web' if !define($opt{'use'}) && defined($opt{'web'});
+    if (!defined($opt{'use'})) {
+        $opt{'use'} = 'web' if defined($opt{'web'});
+        $opt{'use'} = 'if'  if defined($opt{'if'});
+        $opt{'use'} = 'ip'  if defined($opt{'ip'});
+    }
 
     ## infer the IPv6 strategy if possible
     $opt{'usev6'} = 'ip'  if !define($opt{'usev6'}) && defined($opt{'ipv6'});
@@ -1558,8 +1561,15 @@ sub test_possible_ip {
 
     {
         local $opt{'use'} = 'if';
-        foreach my $if (grep {/^[a-zA-Z]/} `ifconfig -a`) {
-            $if =~ s/:?\s.*//is;
+        # Note: The `ip` command adds a `@eth0` suffix to the names of VLAN
+        # interfaces. That `@eth0` suffix is NOT part of the interface name.
+        my @ifs = map({ /^[^\s:]*:\s*([^\s:@]+)/ ? $1 : () }
+                      `command -v ip >/dev/null && ip -o link show`);
+        @ifs = map({ /^([a-zA-Z].*?)(?::?\s.*)?$/ ? $1 : () }
+                   `command -v ifconfig >/dev/null && ifconfig -a`) if $? || !@ifs;
+        @ifs = () if $?;
+        warning("failed to get list of interfaces") if !@ifs;
+        foreach my $if (@ifs) {
             local $opt{'if'} = $if;
             printf "use=if, if=%s address is %s\n", opt('if'), define(get_ip('if'), 'NOT FOUND');
         }
@@ -1876,7 +1886,7 @@ sub _msg {
     }
     if ($prefix) {
         $buffer = "$prefix$buffer";
-        $buffer =~ s/\n/\n$prefix /g;
+        $buffer =~ s/\n/\n$prefix/g;
     }
     $buffer .= "\n";
     print $fh $buffer;
@@ -2354,7 +2364,7 @@ sub filter_local {
 ######################################################################
 ## get_ip
 ######################################################################
-sub get_ip {
+sub 
     my $use = lc shift;
     my $h   = shift;
     my ($ip, $arg, $reply, $url, $skip) = (undef, opt($use, $h), '');
@@ -2366,13 +2376,13 @@ sub get_ip {
 
     } elsif ($use eq 'if') {
         $skip  = opt('if-skip', $h) || '';
-        $reply = `ip -4 -o addr show dev $arg scope global 2>/dev/null`;
-        $reply = `ifconfig $arg 2> /dev/null | grep -w "inet"` if $?;
+        $reply = `command -v ip >/dev/null && ip address show dev $arg`;
+        $reply = `command -v ifconfig >/dev/null && ifconfig $arg` if $?;
         $reply = '' if $?;
 
     } elsif ($use eq 'cmd') {
         if ($arg) {
-            $skip  = opt('cmd-skip', $h)  || '';
+            $skip = opt('cmd-skip', $h) || '';
             $reply = `$arg`;
             $reply = '' if $?;
         }
@@ -2396,8 +2406,8 @@ sub get_ip {
         # Stuff added to support Cisco router ip http daemon
         # User fw-login should only have level 1 access to prevent
         # password theft.  This is pretty harmless.
-        my $queryif  = opt('if', $h);
-        $skip = opt('fw-skip', $h)  || '';
+        my $queryif = opt('if', $h);
+        $skip = opt('fw-skip', $h) || '';
 
         # Convert slashes to protected value "\/"
         $queryif =~ s%\/%\\\/%g;
@@ -3902,10 +3912,10 @@ sub nic_nfsn_gen_auth_header {
 ## nic_nfsn_make_request
 ######################################################################
 sub nic_nfsn_make_request {
-    my $h      = shift;
-    my $path   = shift;
+    my $h = shift;
+    my $path = shift;
     my $method = shift || 'GET';
-    my $body   = shift || '';
+    my $body = shift || '';
 
     my $base_url = "https://$config{$h}{'server'}";
     my $url      = $base_url . $path;
