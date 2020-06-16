@@ -24,7 +24,6 @@ use warnings;
 use Getopt::Long;
 use Sys::Hostname;
 use IO::Socket;
-use Data::Validate::IP;
 
 my $version  = "3.9.1";
 my $programd = $0;
@@ -1825,7 +1824,7 @@ sub minimum {
 sub opt {
     my $v = shift;
     my $h = shift;
-    return $config{$h}{$v} if defined($h && $config{$h}{$v});
+    return $config{$h}{$v} if defined($h) && defined($config{$h}{$v});
     return $opt{$v}        if defined $opt{$v};
     return $globals{$v}    if defined $globals{$v};
     return default($v)     if defined default($v);
@@ -2201,20 +2200,20 @@ sub geturl {
         } elsif ($use_ssl) {
             load_ssl_support;
             $sd = IO::Socket::SSL->new(
-            PeerAddr   => $peer,
-            PeerPort   => $port,
-            Proto      => 'tcp',
-            MultiHomed => 1,
-            Timeout    => opt('timeout'),
+                PeerAddr   => $peer,
+                PeerPort   => $port,
+                Proto      => 'tcp',
+                MultiHomed => 1,
+                Timeout    => opt('timeout'),
             );
             defined $sd or warning("cannot connect to %s:%s socket: %s %s", $peer, $port, $@, IO::Socket::SSL::errstr());
          } else {
             $sd = IO::Socket::INET->new(
-            PeerAddr   => $peer,
-            PeerPort   => $port,
-            Proto      => 'tcp',
-            MultiHomed => 1,
-            Timeout    => opt('timeout'),
+                PeerAddr   => $peer,
+                PeerPort   => $port,
+                Proto      => 'tcp',
+                MultiHomed => 1,
+                Timeout    => opt('timeout'),
             );
             defined $sd or warning("cannot connect to %s:%s socket: %s", $peer, $port, $@);
         }
@@ -2252,8 +2251,7 @@ sub geturl {
             }
         }
         $0 = sprintf("%s - closed %s port %s", $program, $peer, $port);
-    } else
-    {
+    } else {
         # Access network using cURL.  This is required for IPv6
         if (!opt('exec')) {
             debug("skipped network connection");
@@ -2558,6 +2556,15 @@ sub get_ipv6 {
 
     debug("get_ipv6: using %s, %s reports %s", $usev6, $arg, define($ipv6, "<undefined>"));
     return $ipv6;
+}
+
+######################################################################
+## is_ipv6() validates if string is valid IPv6 address
+######################################################################
+sub is_ipv6 {
+    my ($value) = @_;
+    # This little gem from http://home.deds.nl/~aeron/regex/
+    return $value =~ /^(((?=.*(::))(?!.*\3.+\3))\3?|([\dA-F]{1,4}(\3|:\b|$)|\2))(?4){5}((?4){2}|(((2[0-4]|1\d|[1-9])?\d|25[0-5])\.?\b){4})\z/ai;
 }
 
 ######################################################################
