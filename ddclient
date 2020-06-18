@@ -319,15 +319,14 @@ sub ip_strategies_usage {
 }
 
 my %ipv4_strategies = (
-    'no'          => ": depreciated, use 'disabled'",
     'disabled'    => ": do not obtain an IPv4 address for this host",
     'ipv4'        => ": obtain IPv4 from -ipv4 {address}",
     'webv4'       => ": obtain IPv4 from an IP discovery page on the web",
     'fwv4'        => ": obtain IPv4 from the firewall specified by -fwv4 {type|address}",
     'ifv4'        => ": obtain IPv4 from the -ifv4 {interface}",
     'cmdv4'       => ": obtain IPv4 from the -cmdv4 {external-command}",
-    'ciscov4'     => ": obtain IPv4 from Cisco FW at the -fw {address}",
-    'cisco-asav4' => ": obtain IPv4 from Cisco ASA at the -fw {address}",
+    'ciscov4'     => ": obtain IPv4 from Cisco FW at the -fwv4 {address}",
+    'cisco-asav4' => ": obtain IPv4 from Cisco ASA at the -fwv4 {address}",
     map { $_ => sprintf ": obtain IPv4 from %s at the -fwv4 {address}", $builtinfw{$_}->{'name'} } keys %builtinfw,
 );
 sub ipv4_strategies_usage {
@@ -346,8 +345,8 @@ my %ipv6_strategies = (
     'ifv6'        => ": obtain IPv6 from the -if {interface}",
     'cmd'         => ": depreciated, use 'cmdv6'",
     'cmdv6'       => ": obtain IPv6 from the -cmdv6 {external-command}",
-    'ciscov6'     => ": obtain IPv6 from Cisco FW at the -fw {address}",
-    'cisco-asav6' => ": obtain IPv6 from Cisco ASA at the -fw {address}",
+    'ciscov6'     => ": obtain IPv6 from Cisco FW at the -fwv6 {address}",
+    'cisco-asav6' => ": obtain IPv6 from Cisco ASA at the -fwv6 {address}",
     map { $_ => sprintf ": obtain IPv6 from %s at the -fwv6 {address}", $builtinfw{$_}->{'name'} } keys %builtinfw,
 );
 sub ipv6_strategies_usage {
@@ -373,6 +372,7 @@ my %variables = (
         'pid'                 => setv(T_FILE,  0, 0, 1, "",                   undef),
         'proxy'               => setv(T_FQDNP, 0, 0, 1, '',                   undef),
         'protocol'            => setv(T_PROTO, 0, 0, 1, 'dyndns2',            undef),
+
         'use'                 => setv(T_USE,   0, 0, 1, 'ip',                 undef),
         'usev4'               => setv(T_USEV4, 0, 0, 1, undef,                undef),
         'usev6'               => setv(T_USEV6, 0, 0, 1, undef,                undef),
@@ -394,9 +394,9 @@ my %variables = (
         'fw'                  => setv(T_ANY,   0, 0, 1, '',                   undef),
         'fw-skip'             => setv(T_STRING,1, 0, 1, '',                   undef),
         'fwv4'                => setv(T_ANY,   0, 0, 1, '',                   undef),
-        'fwv4-skip'           => setv(T_STRING,1, 0, 1, '',                   undef),
+#        'fwv4-skip'           => setv(T_STRING,1, 0, 1, '',                   undef),
         'fwv6'                => setv(T_ANY,   0, 0, 1, '',                   undef),
-        'fwv6-skip'           => setv(T_STRING,1, 0, 1, '',                   undef),
+#        'fwv6-skip'           => setv(T_STRING,1, 0, 1, '',                   undef),
         'fw-banlocal'         => setv(T_BOOL,  0, 0, 1, 0,                    undef),
         'fw-login'            => setv(T_LOGIN, 1, 0, 1, '',                   undef),
         'fw-password'         => setv(T_PASSWD,1, 0, 1, '',                   undef),
@@ -453,9 +453,9 @@ my %variables = (
         'fw'                  => setv(T_ANY,   0, 0, 1, '',                   undef),
         'fw-skip'             => setv(T_STRING,0, 0, 1, '',                   undef),
         'fwv4'                => setv(T_ANY,   0, 0, 1, '',                   undef),
-        'fwv4-skip'           => setv(T_STRING,0, 0, 1, '',                   undef),
+#        'fwv4-skip'           => setv(T_STRING,0, 0, 1, '',                   undef),
         'fwv6'                => setv(T_ANY,   0, 0, 1, '',                   undef),
-        'fwv6-skip'           => setv(T_STRING,0, 0, 1, '',                   undef),
+#        'fwv6-skip'           => setv(T_STRING,0, 0, 1, '',                   undef),
         'fw-banlocal'         => setv(T_BOOL,  0, 0, 1, 0,                    undef),
         'fw-login'            => setv(T_LOGIN, 0, 0, 1, '',                   undef),
         'fw-password'         => setv(T_PASSWD,0, 0, 1, '',                   undef),
@@ -465,7 +465,7 @@ my %variables = (
 #        'cmdv4-skip'          => setv(T_STRING,0, 0, 1, '',                   undef),
         'cmdv6'               => setv(T_PROG,  0, 0, 1, '',                   undef),
 #        'cmdv6-skip'          => setv(T_STRING,0, 0, 1, '',                   undef),
-        'ip'                  => setv(T_IP,     0, 1, 0, undef,               undef),
+        'ip'                  => setv(T_IP,    0, 1, 0, undef,                undef),
         'ipv4'                => setv(T_IPV4,   0, 1, 0, undef,               undef),
         'ipv6'                => setv(T_IPV6,   0, 1, 0, undef,               undef),
         'wtime'               => setv(T_DELAY, 0, 1, 1, 0,                    interval('30s')),
@@ -495,7 +495,7 @@ my %variables = (
     'noip-common-defaults' => {
         'static'              => setv(T_BOOL,  0, 1, 1, 0,                    undef),
     },
-    'noip-service-common-defaults' => {  ## TODO IPv6
+    'noip-service-common-defaults' => {  ## TODO IPv6 (because 'ip' specified below)
         'server'              => setv(T_FQDNP, 1, 0, 1, 'dynupdate.no-ip.com',undef),
         'login'               => setv(T_LOGIN, 1, 0, 1, '',                   undef),
         'password'            => setv(T_PASSWD,1, 0, 1, '',                   undef),
@@ -555,7 +555,7 @@ my %variables = (
         'custom'              => setv(T_BOOL,  0, 1, 1, 0,                    undef),
         'script'              => setv(T_STRING,1, 1, 1, '/nic/update',        undef),
     },
-    'woima-service-common-defaults' => {  ## TODO IPv6
+    'woima-service-common-defaults' => {  ## TODO IPv6 (because 'ip' specified below)
         'server'              => setv(T_FQDNP, 1, 0, 1, 'dyn.woima.fi',       undef),
         'login'               => setv(T_LOGIN, 1, 0, 1, '',                   undef),
         'password'            => setv(T_PASSWD,1, 0, 1, '',                   undef),
@@ -866,7 +866,7 @@ my @opt = (
 #    [ "ifv6-skip",   "=s", "-ifv6-skip pattern    : skip any IPv6 addresses before 'pattern' in the output of ip or ifconfig {if}" ],
     "",
     [ "web",         "=s", "-web provider|url     : depreciated, use 'webv4' or 'webv6'" ],
-    [ "web-skip",    "=s", "-web-skip pattern     : sdepreciated, use 'webv4-skip' or 'webv6-skip'" ],
+    [ "web-skip",    "=s", "-web-skip pattern     : depreciated, use 'webv4-skip' or 'webv6-skip'" ],
     [ "webv4",       "=s", "-webv4 provider|url   : obtain IPv4 address from provider's IP checking page" ],
     [ "webv4-skip",  "=s", "-webv4-skip pattern   : skip any IPv4 addresses before 'pattern' on the web provider|url" ],
     [ "webv6",       "=s", "-webv6 provider|url   : obtain IPv6 address from provider's IP checking page" ],
@@ -874,11 +874,14 @@ my @opt = (
     "",
     [ "fw",          "=s", "-fw address|url       : depreciated, use 'fwv4' or 'fwv6'" ],
     [ "fw-skip",     "=s", "-fw-skip pattern      : depreciated, use 'fwv4-skip' or 'fwv6-skip'" ],
-    [ "fwv4",        "=s", "-fwv4 address|url     : obtain IPv4 address from firewall at 'address'" ],
-    [ "fwv4-skip",   "=s", "-fwv4-skip pattern    : skip any IPv4 addresses before 'pattern' on the firewall address|url" ],
-    [ "fwv6",        "=s", "-fwv6 address|url     : obtain IPv6 address from firewall at 'address'" ],
-    [ "fwv6-skip",   "=s", "-fwv6-skip pattern    : skip any IPv6 addresses before 'pattern' on the firewall address|url" ],
+    [ "fwv4",        "=s", "-fwv4 address|url     : obtain IPv4 address from firewall at 'address' or 'url'" ],
+#    [ "fwv4-skip",   "=s", "-fwv4-skip pattern    : skip any IPv4 addresses before 'pattern' on the firewall address|url" ],
+    [ "fwv6",        "=s", "-fwv6 address|url     : obtain IPv6 address from firewall at 'address' or 'url'" ],
+#    [ "fwv6-skip",   "=s", "-fwv6-skip pattern    : skip any IPv6 addresses before 'pattern' on the firewall address|url" ],
     [ "fw-banlocal", "!",  "-fw-banlocal          : ignore local IP addresses on the firewall address|url" ],
+# TODO IPv6  Do we need separate IPv4 and IPv6 fw-banlocal or can this apply to both?
+# TODO IPv6  For IPv4 this is addresses like 192.168.0.0/16
+# TODO IPv6  For IPv6 this is Link Local (LLA) and Unique Local (ULA)
     [ "fw-login",    "=s", "-fw-login login       :   use 'login' when getting IP from fw" ],
     [ "fw-password", "=s", "-fw-password secret   :   use password 'secret' when getting IP from fw" ],
     "",
