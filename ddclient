@@ -311,7 +311,7 @@ my %ip_strategies = (
     'cmd'       => ": depreciated, see 'usev4' and 'usev6'",
     'cisco'     => ": depreciated, see 'usev4' and 'usev6'",
     'cisco-asa' => ": depreciated, see 'usev4' and 'usev6'",
-    map { $_ => sprintf ": depreciated, see 'usev4' and 'usev6'", $builtinfw{$_}->{'name'} } keys %builtinfw,
+    map { $_ => sprintf ": Built-in firewall %s depreciated, see 'usev4' and 'usev6'", $builtinfw{$_}->{'name'} } keys %builtinfw,
 );
 
 sub ip_strategies_usage {
@@ -541,8 +541,9 @@ my %variables = (
         'server'              => setv(T_FQDNP, 1, 0, 1, 'www.duckdns.org',    undef),
         'login'               => setv(T_LOGIN, 0, 0, 0, 'unused',             undef),
     },
-    'he-common-defaults' => {
-        'server' => setv(T_FQDNP, 1, 0, 1, 'dyn.dns.he.net', undef),
+    'he-common-defaults'      => {
+        'server'              => setv(T_FQDNP, 1, 0, 1, 'dyn.dns.he.net',     undef),
+    },
     'freemyip-common-defaults' => {
         'server'              => setv(T_FQDNP, 1, 0, 1, 'freemyip.com',       undef),
         'login'               => setv(T_LOGIN, 0, 0, 0, 'unused',             undef),
@@ -2339,8 +2340,8 @@ sub geturl {
 
             # don't include ${url} as that might expose login credentials
             $0 = sprintf("%s - curl (w/headers) sending to %s", $program, "https://${server}");
-
-            $reply = <<"USE_CURL_WITH_HEADERS";
+            verbose("SENDING:", "curl (w/headers) to %s", "https://${server}");
+            $reply = <<'USE_CURL_WITH_HEADERS';
 /usr/bin/curl -s -X $method --user-agent '${program}/${version}' \\
               --connect-timeout $timeout --max-time $timeout \\
               ${head_args} \\
@@ -2367,13 +2368,12 @@ USE_CURL_WITH_HEADERS
 
             # don't include ${url} as that might expose login credentials
             $0 = sprintf("%s - curl sending to %s", $program, "${protocol}://${server}");
-
-            $reply = <<"USE_CURL";
+            verbose("SENDING:", "curl to %s", "${protocol}://${server}");
+            $reply = <<`USE_CURL`;
 /usr/bin/curl -s ${auth} --user-agent '${program}/${version}' \\
               --connect-timeout $timeout --max-time $timeout $curlopt \\
               --url '${protocol}://${server}/${url}' 2>/dev/null
 USE_CURL
-
             if (!$reply) {
                 # don't include ${url} as that might expose login credentials
                 warning("curl cannot connect to ${protocol}://${server}");
@@ -2611,9 +2611,9 @@ sub get_ipv6 {
         # filter for Global Unicast Address (GUA) as it would not be valid
         # to try and update DNS with a link local or Unique Local (ULA) Address
         if ($reply =~ /^.*? ([23][a-f0-9]{3}:[a-f0-9:]+:[a-f0-9]{1,4})[\/| ].*/is) {
-            $reply = $1;
+            $ipv6 = $1;
         } else {
-            $reply = '';
+            $ipv6 = '';
         }
     } else {
         # We found IPv6 address from some method other than local interface
@@ -2629,7 +2629,7 @@ sub get_ipv6 {
         $ipv6 = undef;
     }
 
-    debug("get_ipv6: using %s, %s reports %s", $usev6, $arg, define($ipv6, "<undefined>"));
+    debug("get_ipv6: using (%s, %s) reports %s", $usev6, $arg, define($ipv6, "<undefined>"));
     return $ipv6;
 }
 
