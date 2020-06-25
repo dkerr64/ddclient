@@ -2929,13 +2929,13 @@ sub nic_updateable {
         {
             warning(
                 "skipping update of %s from %s to %s.\nlast updated %s.\nWait at least %s between update attempts.",
-			 $host,
-			 ($cache{$host}{'ipv6'}    ? $cache{$host}{'ipv6'}                : '<nothing>'),
-			 $ipv6,
-			 ($cache{$host}{'mtime'} ? prettytime($cache{$host}{'mtime'}) : '<never>'),
-			 prettyinterval($config{$host}{'min-interval'})
+                $host,
+                ($cache{$host}{'ipv6'}    ? $cache{$host}{'ipv6'}                : '<nothing>'),
+                $ipv6,
+                ($cache{$host}{'mtime'} ? prettytime($cache{$host}{'mtime'}) : '<never>'),
+                prettyinterval($config{$host}{'min-interval'})
             ) if opt('verbose') || !($cache{$host}{'warned-min-interval'} // 0);
-				$cache{$host}{'warned-min-interval'} = $now;
+                $cache{$host}{'warned-min-interval'} = $now;
 
         } elsif (($cache{$host}{'status-ipv6'} ne 'good') && !interval_expired($host, 'atime', 'min-error-interval')) {
             if (opt('verbose')
@@ -2944,18 +2944,18 @@ sub nic_updateable {
             {
                 warning(
                     "skipping update of %s from %s to %s.\nlast updated %s but last attempt on %s failed.\nWait at least %s between update attempts.",
-			 $host,
-			 ($cache{$host}{'ipv6'}    ? $cache{$host}{'ipv6'}                : '<nothing>'),
-			 $ipv6,
-			 ($cache{$host}{'mtime'} ? prettytime($cache{$host}{'mtime'}) : '<never>'),
-			 ($cache{$host}{'atime'} ? prettytime($cache{$host}{'atime'}) : '<never>'),
-			 prettyinterval($config{$host}{'min-error-interval'})
+                    $host,
+                    ($cache{$host}{'ipv6'}    ? $cache{$host}{'ipv6'}                : '<nothing>'),
+                    $ipv6,
+                    ($cache{$host}{'mtime'} ? prettytime($cache{$host}{'mtime'}) : '<never>'),
+                    ($cache{$host}{'atime'} ? prettytime($cache{$host}{'atime'}) : '<never>'),
+                    prettyinterval($config{$host}{'min-error-interval'})
                 );
                 if (!($ipv6 // 0) && !opt('verbose')) {
                     $warned_ipv6{$host} = ($warned_ipv6{$host} // 0) + 1;
                     warning("IPv6 address for %s undefined. Warned %s times, suppressing further warnings",
                         $host, $inv_ip_warn_count)
-                      if ($warned_ipv6{$host} >= $inv_ip_warn_count);
+                        if ($warned_ipv6{$host} >= $inv_ip_warn_count);
                 }
             }
             $cache{$host}{'warned-min-error-interval'} = $now;
