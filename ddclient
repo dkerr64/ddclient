@@ -935,7 +935,7 @@ my $saved_cache = '';
 my %saved_opt   = %opt;
 $result = 'OK';
 my (%warned_ipv4, %warned_ipv6);
-my $inv_ip_warn_count = define(opt('max-warn'), 1);
+my $inv_ip_warn_count = opt('max-warn') // 1;
 
 test_geturl(opt('geturl')) if opt('geturl');
 
@@ -1091,7 +1091,7 @@ sub update_nics {
                 } else {
                     $iplist{$use}{$arg_ip}{$arg_fw}{$arg_if}{$arg_web}{$arg_cmd} = $ip;
                 }
-                debug("IPv4 %s", define($ip, "<undefined>"));
+                debug("IPv4 %s", $ip // "<undefined>");
             }
             $config{$h}{'wantip'} = $ip;
             if (defined($usev6)) {
@@ -1451,8 +1451,11 @@ sub init_config {
     }
 
     ## infer the IPv6 strategy if possible
-    $opt{'usev6'} = 'ip'  if !define($opt{'usev6'}) && defined($opt{'ipv6'});
-    $opt{'usev6'} = 'web' if !define($opt{'usev6'}) && defined($opt{'webv6'});
+    if (!defined($opt{'usev6'})) {
+        $opt{'usev6'} = 'web' if defined($opt{'webv6'});
+        $opt{'usev6'} = 'if'  if defined($opt{'ifv6'});
+        $opt{'usev6'} = 'ip'  if defined($opt{'ipv6'});
+    }
 
     ## sanity check
     $opt{'max-interval'}       = min(interval(opt('max-interval')), interval(default('max-interval')));
@@ -1623,6 +1626,7 @@ sub process_args {
     }
     return $usage;
 }
+
 ######################################################################
 ## test_possible_ip - print possible IPs
 ######################################################################
@@ -1674,8 +1678,9 @@ sub test_possible_ip {
     }
 
     # Now for IPv6
-    printf "use=ip, ipv6=%s address is %s\n", opt('ipv6'), define(get_ipv6('ip'), 'NOT FOUND')
-    if defined opt('ipv6');
+    printf "use=ip, ipv6=%s address is %s\n", opt('ip'), get_ipv6('ip') // 'NOT FOUND'
+        if defined opt('ipv6');
+
     {
         # Note: The `ip` command adds a `@eth0` suffix to the names of VLAN
         # interfaces. That `@eth0` suffix is NOT part of the interface name.
@@ -1687,21 +1692,21 @@ sub test_possible_ip {
         warning("failed to get list of interfaces") if !@ifs;
         foreach my $if (@ifs) {
             local $opt{'if'} = $if;
-            printf "use=if, ifv6=%s address is %s\n", opt('if'), define(get_ipv6('if'), 'NOT FOUND');
+            printf "use=if, ifv6=%s address is %s\n", opt('if'), get_ipv6('if') // 'NOT FOUND';
         }
     }
     {
         local $opt{'use'} = 'web';
         foreach my $web (sort keys %builtinweb) {
             local $opt{'webv6'} = $web;
-            printf "use=web, webv6=$web address is %s\n", define(get_ipv6('web'), 'NOT FOUND');
+            printf "use=web, webv6=$web address is %s\n", get_ipv6('web') // 'NOT FOUND';
         }
-        printf "use=web, webv6=%s address is %s\n", opt('webv6'), define(get_ipv6('web'), 'NOT FOUND')
-        if ! exists $builtinweb{opt('webv6')};
+        printf "use=web, webv6=%s address is %s\n", opt('webv6'), get_ipv6('web') // 'NOT FOUND'
+            if ! exists $builtinweb{opt('webv6')};
     }
     if (opt('cmd')) {
         local $opt{'use'} = 'cmd';
-        printf "use=cmd, cmdv6=%s address is %s\n", opt('cmd'), define(get_ipv6('cmd'), 'NOT FOUND');
+        printf "use=cmd, cmdv6=%s address is %s\n", opt('cmd'), get_ipv6('cmd') // 'NOT FOUND';
     }
 
     exit 0 unless opt('debug');
@@ -2223,6 +2228,9 @@ sub geturl {
     debug("ip ver   = %s", $ipversion);
 
     if (opt('curl')) {
+        if (!`/usr/bin/curl --version 2>/dev/null`) {
+            fatal("You requested network access with curl but curl is not installed.");
+        }
         # Access network using curl.
         if (!opt('exec')) {
             debug("skipped network connection");
@@ -2646,11 +2654,11 @@ sub get_ipv6 {
         }
     }
 
-    if (($usev6 ne 'ip') && (define($ipv6,'') eq '::')) {
+    if (($usev6 ne 'ip') && (($ipv6 // '') eq '::')) {
         $ipv6 = undef;
     }
 
-    debug("get_ipv6: using (%s, %s) reports %s", $usev6, $arg, define($ipv6, "<undefined>"));
+    debug("get_ipv6: using (%s, %s) reports %s", $usev6, $arg, $ipv6 // "<undefined>");
     return $ipv6;
 }
 
@@ -2829,11 +2837,11 @@ sub nic_updateable {
     my $ip     = $config{$host}{'wantip'};
     my $ipv6   = $config{$host}{'wantipv6'};
 
-    if (defined($config{$host}{'use'}) && ($config{$host}{'use'} ne 'no') && define($ipv6, 0) && define($warned_ipv6{$host}, 0)) {
+    if (defined($config{$host}{'use'}) && ($config{$host}{'use'} ne 'no') && ($ipv6 // 0) && ($warned_ipv6{$host} // 0)) {
         $warned_ipv6{$host} = 0;
         warning("IPv6 address for %s valid: %s. Reset warning count", $host, $ipv6);
     }
-    if (defined($config{$host}{'usev6'}) && ($config{$host}{'usev6'} ne 'no') && define($ip, 0) && define($warned_ipv4{$host}, 0)) {
+    if (defined($config{$host}{'usev6'}) && ($config{$host}{'usev6'} ne 'no') && ($ip // 0) && ($warned_ipv4{$host} // 0)) {
         $warned_ipv4{$host} = 0;
         warning("IP address for %s valid: %s. Reset warning count", $host, $ip);
     }
@@ -2890,7 +2898,7 @@ sub nic_updateable {
         } elsif (($cache{$host}{'status'} ne 'good') && !interval_expired($host, 'atime', 'min-error-interval')) {
 
             if (opt('verbose')
-                || (!define($cache{$host}{'warned-min-error-interval'}, 0) && (define($warned_ipv4{$host}, 0) < $inv_ip_warn_count))
+                || (!($cache{$host}{'warned-min-error-interval'} // 0) && (($warned_ipv4{$host} // 0) < $inv_ip_warn_count))
               )
             {
                 warning(
@@ -2903,7 +2911,7 @@ sub nic_updateable {
                     prettyinterval($config{$host}{'min-error-interval'})
                 );
                 if (!($ip // 0) && !opt('verbose')) {
-                    $warned_ipv4{$host} = define($warned_ipv4{$host}, 0) + 1;
+                    $warned_ipv4{$host} = ($warned_ipv4{$host} // 0) + 1;
                     warning("IP address for %s undefined. Warned %s times, suppressing further warnings", $host, $inv_ip_warn_count)
                       if ($warned_ipv4{$host} >= $inv_ip_warn_count);
                 }
@@ -2926,12 +2934,12 @@ sub nic_updateable {
 			 $ipv6,
 			 ($cache{$host}{'mtime'} ? prettytime($cache{$host}{'mtime'}) : '<never>'),
 			 prettyinterval($config{$host}{'min-interval'})
-            ) if opt('verbose') || !define($cache{$host}{'warned-min-interval'}, 0);
+            ) if opt('verbose') || !($cache{$host}{'warned-min-interval'} // 0);
 				$cache{$host}{'warned-min-interval'} = $now;
 
         } elsif (($cache{$host}{'status-ipv6'} ne 'good') && !interval_expired($host, 'atime', 'min-error-interval')) {
             if (opt('verbose')
-                || (!define($cache{$host}{'warned-min-error-interval'}, 0) && (define($warned_ipv6{$host}, 0) < $inv_ip_warn_count))
+                || (!($cache{$host}{'warned-min-error-interval'} // 0) && (($warned_ipv6{$host} // 0) < $inv_ip_warn_count))
               )
             {
                 warning(
@@ -2943,8 +2951,8 @@ sub nic_updateable {
 			 ($cache{$host}{'atime'} ? prettytime($cache{$host}{'atime'}) : '<never>'),
 			 prettyinterval($config{$host}{'min-error-interval'})
                 );
-                if (!define($ipv6, 0) && !opt('verbose')) {
-                    $warned_ipv6{$host} = define($warned_ipv6{$host}, 0) + 1;
+                if (!($ipv6 // 0) && !opt('verbose')) {
+                    $warned_ipv6{$host} = ($warned_ipv6{$host} // 0) + 1;
                     warning("IPv6 address for %s undefined. Warned %s times, suppressing further warnings",
                         $host, $inv_ip_warn_count)
                       if ($warned_ipv6{$host} >= $inv_ip_warn_count);
@@ -4370,7 +4378,7 @@ sub nic_freedns_update {
         my $ip = delete $config{$h}{'wantip'};
         my $ipv6 = delete $config{$h}{'wantipv6'};
 
-        info("%s: setting IP address(s) to %s / %s", $h, define($ip, "<undefined>"), define($ipv6, "<undefined>"));
+        info("%s: setting IP address(s) to %s / %s", $h, $ip // "<undefined>", $ipv6 // "<undefined>");
         if (defined($freedns_hosts{$h}) && defined($ip)) {
             if ($ip eq $freedns_hosts{$h}->[1]) {
                 $config{$h}{'ip'}     = $ip;
