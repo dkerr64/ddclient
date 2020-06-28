@@ -2096,11 +2096,13 @@ sub check_value {
         return undef if $value eq "";
 
     } elsif ($type eq T_IP) {
+        return undef if !is_ipv4($value) && !is_ipv6($value);
+
+    } elsif ($type eq T_IPV4) {
         return undef if !is_ipv4($value);
 
     } elsif ($type eq T_IPV6) {
-        # This little gem from http://home.deds.nl/~aeron/regex/
-        return undef if $value !~ /^(((?=.*(::))(?!.*\3.+\3))\3?|([\dA-F]{1,4}(\3|:\b|$)|\2))(?4){5}((?4){2}|(((2[0-4]|1\d|[1-9])?\d|25[0-5])\.?\b){4})\z/ai;
+        return undef if !is_ipv6($value);
     }
     return $value;
 }
@@ -2413,26 +2415,6 @@ USE_CURL
 }
 
 ######################################################################
-## un_zero_pad
-######################################################################
-sub un_zero_pad {
-    my $in_str  = shift(@_);
-    my @out_str = ();
-
-    if ($in_str eq '0.0.0.0') {
-        return $in_str;
-    }
-
-    foreach my $block (split /\./, $in_str) {
-        $block =~ s/^0+//;
-        if ($block eq '') {
-            $block = '0';
-        }
-        push @out_str, $block;
-    }
-    return join('.', @out_str);
-}
-######################################################################
 ## get_ip
 ######################################################################
 sub get_ip {
@@ -2442,7 +2424,7 @@ sub get_ip {
     $arg = '' unless $arg;
 
     if ($use eq 'ip') {
-        $ip  = opt('ip', $h);
+        $reply  = opt('ip', $h);
         $arg = 'ip';
 
     } elsif ($use eq 'if') {
@@ -2543,15 +2525,8 @@ sub get_ip {
         $skip  =~ s/ /\\s/is;
         $reply =~ s/^.*?${skip}//is;
     }
-    if (defined($ip)) {
-        # no need to parse $reply
-    } elsif ($ip = ipv4_match($reply)) {
-        $ip = un_zero_pad($ip);
-    } elsif ($ip = ipv6_match($reply)) {
-        $ip = un_zero_pad($ip);
-    } else {
-        warning("found neither ipv4 nor ipv6 address");
-    }
+    $ip //= ipv4_extract($reply) // ipv6_extract($reply);
+    warning("found neither IPv4 nor IPv6 address") if !defined($ip);
     if ($use ne 'ip' && ($ip // '') eq '0.0.0.0') {
         $ip = undef;
     }
@@ -2642,57 +2617,78 @@ sub get_ipv6 {
 }
 
 ######################################################################
-## is_ipv4() validates if string is valid IPv4 address and only
-## a valid IPv4 address (no preceding or trailing spaces/characters)
+## is_ipv4() validates if string is valid IPv4 address and only a
+## valid address with no preceding or trailing spaces/characters
+## and no embedded leading zeros.
 ######################################################################
 sub is_ipv4 {
     my ($value) = @_;
-    return (length($value // '') != 0) && ($value eq (ipv4_match($value) // ''));
+    return (length($value // '') != 0) && ($value eq (ipv4_extract($value) // ''));
 }
 
 ######################################################################
-## ipv4_match() extracts the first valid IPv4 address from given string
+## ipv4_extract() extracts the first valid IPv4 address from given string.
+## Accepts leading zeros in the address but removes them in returned value
 ######################################################################
-sub ipv4_match {
-    (shift // '') =~ /\b((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))\b/ai;
-    return $1;
+sub ipv4_extract{
+    (shift // '') =~ /\b((?:(?<octet>25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3} ## first three bytes
+                         (?&octet))\b/xa;                               ## last one (without period)
+    my $ip = ($1 // '');
+    $ip =~ s/\b0+\B//g;                                                 ## remove leading zeros
+    return $ip;
 }
 
 ######################################################################
-## is_ipv6() validates if string is valid IPv6 address
+## is_ipv6() validates if string is valid IPv6 address with no preceding
+## or trailing spaces/characters and no embedded leading zeros.
 ######################################################################
 sub is_ipv6 {
     my ($value) = @_;
-    # This little gem from http://home.deds.nl/~aeron/regex/
-    return $value =~ /^(((?=.*(::))(?!.*\3.+\3))\3?|([\dA-F]{1,4}(\3|:\b|$)|\2))(?4){5}((?4){2}|(((2[0-4]|1\d|[1-9])?\d|25[0-5])\.?\b){4})\z/ai;
+    return (length($value // '') != 0) && ($value eq (ipv6_extract($value) // ''));
 }
 
 ######################################################################
-## ipv6_match determine ipv6 address from given string and return them
+## ipv6_extract() extracts the first valid IPv6 address from given string
+## IPv6 must be in standard or compressed format.
+## Mixed IPv6/IPv4 not supported.
+## Accepts leading zeros in the address but removes them in returned value
 ######################################################################
-sub ipv6_match {
-    my $content = shift;
-    my $omits;
-    my $ip          = "";
-    my $linenumbers = 0;
+sub ipv6_extract{
+    (shift // '') =~ /(?<![:.\w])                                     ## Negative lookbehind for word boundry
+                      ( (?:[0-9A-F]{1,4}:){7}[0-9A-F]{1,4}            ## Is in standard format
+                       |(?=(?:[0-9A-F]{0,4}:){0,7}[0-9A-F]{0,4}       ## OR compressed with at most 7 colons
+                        (?![:.\w]))                                   ##   and negative lookahead for boundry
+                        (?:(?:[0-9A-F]{1,4}:){1,7}|:)(?:(?::[0-9A-F]{1,4}){1,7}|:)  ## and only 1 double-colon
+                       |(?:[0-9A-F]{1,4}:){7}:                        ## OR compressed with 8 colons (double at end)
+                       |:(?::[0-9A-F]{1,4}){7}                        ## OR compressed with 8 colons (double at front)
+                      )                                               ## End of first capture group
+                      (?![:.\w])/xai;                                 ## Negative lookahead for boundry
+    my $ip = ($1 // '');
+    $ip =~ s/\b0+\B//g;                                               ## remove leading zeros
+    return $ip;
+}
 
-    my @values = split('\n', $content);
-    foreach my $val (@values) {
-        next unless $val =~ /((:{0,2}[A-F0-9]{1,4}){0,7}:{1,2}[A-F0-9]{1,4})/ai; # invalid char
-        my $parsed = $1;
-
-        # check for at least 7 colons
-        my $count_colon = () = $parsed =~ /:/g;
-        if ($count_colon != 7) {
-            # or one double colon
-            my $count_double_colon = () = $parsed =~ /::/g;
-            if ($count_double_colon != 1) {
-                next
-            }
-        }
-        return $parsed;
-    }
-    return;
+######################################################################
+## ipv6_extract_gua() extracts the first valid IPv6 Global Unicast Address (GUA)
+## from given string. IPv6 must be in standard or compressed format.
+## Mixed IPv6/IPv4 not supported.
+## Accepts leading zeros in the address but removes them in returned value
+######################################################################
+sub ipv6_extract_gua {
+    (shift // '') =~ /(?<![:.\w])                                     ## Negative lookbehind for word boundry
+                      ( [23][A-F0-9]{3}:                              ## Starts with 2xxx: or 3xxx:
+                        (?:[0-9A-F]{1,4}:){6}[0-9A-F]{1,4}            ##   in standard format
+                       |(?=[23][A-F0-9]{3}:                           ## OR starts with 2xxx: or 3xxx:
+                        (?:[0-9A-F]{0,4}:){0,6}[0-9A-F]{0,4}          ##   in compressed with at most 7 colons
+                        (?![:.\w]))                                   ##   and negative lookahead for boundry
+                        (?:(?:[0-9A-F]{1,4}:){1,7}|:)(?:(?::[0-9A-F]{1,4}){1,7}|:)  ## and only 1 double-colon
+                       |[23][A-F0-9]{3}:                              ## OR starts with 2xxx: or 3xxx:
+                        (?:[0-9A-F]{1,4}:){6}:                        ##    compressed with 8 colons (double at end)
+                      )                                               ## End of first capture group
+                      (?![:.\w])/xai;                                 ## Negative lookahead for boundry
+    my $ip = ($1 // '');
+    $ip =~ s/\b0+\B//g;                                               ## remove leading zeros
+    return $ip;
 }
 
 ######################################################################
