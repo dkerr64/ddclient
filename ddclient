@@ -383,8 +383,6 @@ my %variables = (
         'ifv4'                => setv(T_IFV4,  0, 0, 1, undef,                undef),
         'ifv6'                => setv(T_IFV4,  0, 0, 1, undef,                undef),
         'if-skip'             => setv(T_STRING,1, 0, 1, '',                   undef),
-#        'ifv4-skip'           => setv(T_STRING,1, 0, 1, '',                   undef),
-#        'ifv6-skip'           => setv(T_STRING,1, 0, 1, '',                   undef),
         'web'                 => setv(T_STRING,0, 0, 1, 'dyndns',             undef),
         'web-skip'            => setv(T_STRING,1, 0, 1, '',                   undef),
         'webv4'               => setv(T_STRING,0, 0, 1, '',                   undef),
@@ -402,9 +400,7 @@ my %variables = (
         'cmd'                 => setv(T_PROG,  0, 0, 1, '',                   undef),
         'cmd-skip'            => setv(T_STRING,1, 0, 1, '',                   undef),
         'cmdv4'               => setv(T_PROG,  0, 0, 1, '',                   undef),
-#        'cmdv4-skip'          => setv(T_STRING,1, 0, 1, '',                   undef),
         'cmdv6'               => setv(T_PROG,  0, 0, 1, '',                   undef),
-#        'cmdv6-skip'          => setv(T_STRING,1, 0, 1, '',                   undef),
 
         'timeout'             => setv(T_DELAY, 0, 0, 1, interval('120s'),     interval('120s')),
         'retry'               => setv(T_BOOL,  0, 0, 0, 0,                    undef),
@@ -441,8 +437,6 @@ my %variables = (
         'ifv4'                => setv(T_IFV4,  0, 0, 1, undef,                undef),
         'ifv6'                => setv(T_IFV6,  0, 0, 1, undef,                undef),
         'if-skip'             => setv(T_STRING,0, 0, 1, '',                   undef),
-#        'ifv4-skip'           => setv(T_STRING,0, 0, 1, '',                   undef),
-#        'ifv6-skip'           => setv(T_STRING,0, 0, 1, '',                   undef),
         'web'                 => setv(T_STRING,0, 0, 1, 'dyndns',             undef),
         'web-skip'            => setv(T_STRING,0, 0, 1, '',                   undef),
         'webv4'               => setv(T_STRING,0, 0, 1, undef,	              undef),
@@ -460,9 +454,7 @@ my %variables = (
         'cmd'                 => setv(T_PROG,  0, 0, 1, '',                   undef),
         'cmd-skip'            => setv(T_STRING,0, 0, 1, '',                   undef),
         'cmdv4'               => setv(T_PROG,  0, 0, 1, '',                   undef),
-#        'cmdv4-skip'          => setv(T_STRING,0, 0, 1, '',                   undef),
         'cmdv6'               => setv(T_PROG,  0, 0, 1, '',                   undef),
-#        'cmdv6-skip'          => setv(T_STRING,0, 0, 1, '',                   undef),
         'ip'                  => setv(T_IP,    0, 1, 0, undef,                undef),
         'ipv4'                => setv(T_IPV4,   0, 1, 0, undef,               undef),
         'ipv6'                => setv(T_IPV6,   0, 1, 0, undef,               undef),
@@ -862,8 +854,6 @@ my @opt = (
     [ "ifv4",        "=s", "-ifv4 interface       : obtain IPv4 address from 'interface'" ],
     [ "ifv6",        "=s", "-ifv6 interface       : obtain IPv6 address from 'interface'" ],
     [ "if-skip",     "=s", "-if-skip pattern      : depreciated, not required" ],
-#    [ "ifv4-skip",   "=s", "-ifv4-skip pattern    : skip any IPv4 addresses before 'pattern' in the output of ip or ifconfig {if}" ],
-#    [ "ifv6-skip",   "=s", "-ifv6-skip pattern    : skip any IPv6 addresses before 'pattern' in the output of ip or ifconfig {if}" ],
     "",
     [ "web",         "=s", "-web provider|url     : depreciated, use 'webv4' or 'webv6'" ],
     [ "web-skip",    "=s", "-web-skip pattern     : depreciated, use 'webv4-skip' or 'webv6-skip'" ],
@@ -884,9 +874,7 @@ my @opt = (
     [ "cmd",         "=s", "-cmd program          : depreciated, use 'cmdv4' or 'cmdv6'" ],
     [ "cmd-skip",    "=s", "-cmd-skip pattern     : depreciated, filter in program wrapper script" ],
     [ "cmdv4",       "=s", "-cmdv4 program        : obtain IPv6 address from by calling {program}" ],
-#    [ "cmdv4-skip",  "=s", "-cmdv4-skip pattern   : skip any IPv6 addresses before 'pattern' in the output of {cmd}" ],
     [ "cmdv6",       "=s", "-cmdv6 program        : obtain IPv6 address from by calling {program}" ],
-#    [ "cmdv6-skip",  "=s", "-cmdv6-skip pattern   : skip any IPv6 addresses before 'pattern' in the output of {cmd}" ],
     "",
     [ "login",       "=s", "-login user           : login as 'user'" ],
     [ "password",    "=s", "-password secret      : use password 'secret'" ],
@@ -2554,7 +2542,6 @@ sub get_ipv6 {
         $arg = 'ipv6';
 
     } elsif ($usev6 eq 'if') {
-        $skip  = opt('ifv6-skip', $h)  || '';
         $reply = `command -v ip >/dev/null && ip -6 -o addr show dev $arg scope global 2>/dev/null | grep -v "deprecated" | grep -v "temporary"`;
         $reply = `command -v ifconfig >/dev/null && ifconfig $arg 2>/dev/null | grep -w "inet6" | grep -v "deprecated" | grep -v "temporary"` if $?;
         $reply = '' if $?;
@@ -2562,7 +2549,6 @@ sub get_ipv6 {
     }  elsif ($usev6 eq 'cmd') {
         $arg = opt('cmdv6', $h);
         if ($arg) {
-            $skip  = opt('cmdv6-skip', $h)  || '';
             debug("GetIPv6 cmd: %s",$arg);
             $reply = `$arg`;
             $reply = '' if $?;
