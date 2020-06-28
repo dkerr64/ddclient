@@ -322,9 +322,9 @@ my %ipv4_strategies = (
     'disabled'    => ": do not obtain an IPv4 address for this host",
     'ipv4'        => ": obtain IPv4 from -ipv4 {address}",
     'webv4'       => ": obtain IPv4 from an IP discovery page on the web",
-    'fwv4'        => ": obtain IPv4 from the firewall specified by -fwv4 {type|address}",
     'ifv4'        => ": obtain IPv4 from the -ifv4 {interface}",
     'cmdv4'       => ": obtain IPv4 from the -cmdv4 {external-command}",
+    'fwv4'        => ": obtain IPv4 from the firewall specified by -fwv4 {type|address}",
     'ciscov4'     => ": obtain IPv4 from Cisco FW at the -fwv4 {address}",
     'cisco-asav4' => ": obtain IPv4 from Cisco ASA at the -fwv4 {address}",
     map { $_ => sprintf ": obtain IPv4 from %s at the -fwv4 {address}", $builtinfw{$_}->{'name'} } keys %builtinfw,
@@ -341,10 +341,10 @@ my %ipv6_strategies = (
     'web'         => ": depreciated, use 'webv6'",
     'webv6'       => ": obtain IPv6 from an IP discovery page on the web",
     'if'          => ": depreciated, use 'ifv6'",
-    'fwv6'        => ": obtain IPv6 from the firewall specified by -fwv6 {type|address}",
     'ifv6'        => ": obtain IPv6 from the -if {interface}",
     'cmd'         => ": depreciated, use 'cmdv6'",
     'cmdv6'       => ": obtain IPv6 from the -cmdv6 {external-command}",
+    'fwv6'        => ": obtain IPv6 from the firewall specified by -fwv6 {type|address}",
     'ciscov6'     => ": obtain IPv6 from Cisco FW at the -fwv6 {address}",
     'cisco-asav6' => ": obtain IPv6 from Cisco ASA at the -fwv6 {address}",
     map { $_ => sprintf ": obtain IPv6 from %s at the -fwv6 {address}", $builtinfw{$_}->{'name'} } keys %builtinfw,
@@ -1670,7 +1670,7 @@ sub test_possible_ip {
     }
 
     # Now for IPv6
-    printf "use=ip, ipv6=%s address is %s\n", opt('ip'), get_ipv6('ip') // 'NOT FOUND'
+    printf "use=ipv6, ipv6=%s address is %s\n", opt('ipv6'), get_ipv6('ipv6') // 'NOT FOUND'
         if defined opt('ipv6');
 
     {
@@ -1683,22 +1683,22 @@ sub test_possible_ip {
         @ifs = () if $?;
         warning("failed to get list of interfaces") if !@ifs;
         foreach my $if (@ifs) {
-            local $opt{'if'} = $if;
-            printf "use=if, ifv6=%s address is %s\n", opt('if'), get_ipv6('if') // 'NOT FOUND';
+            local $opt{'ifv6'} = $if;
+            printf "use=ifv6, ifv6=%s address is %s\n", opt('ifv6'), get_ipv6('ifv6') // 'NOT FOUND';
         }
     }
     {
-        local $opt{'use'} = 'web';
+        local $opt{'usev6'} = 'webv6';
         foreach my $web (sort keys %builtinweb) {
             local $opt{'webv6'} = $web;
-            printf "use=web, webv6=$web address is %s\n", get_ipv6('web') // 'NOT FOUND';
+            printf "use=webv6, webv6=$web address is %s\n", get_ipv6('webv6') // 'NOT FOUND';
         }
-        printf "use=web, webv6=%s address is %s\n", opt('webv6'), get_ipv6('web') // 'NOT FOUND'
+        printf "use=webv6, webv6=%s address is %s\n", opt('webv6'), get_ipv6('webv6') // 'NOT FOUND'
             if ! exists $builtinweb{opt('webv6')};
     }
-    if (opt('cmd')) {
-        local $opt{'use'} = 'cmd';
-        printf "use=cmd, cmdv6=%s address is %s\n", opt('cmd'), get_ipv6('cmd') // 'NOT FOUND';
+    if (opt('cmdv6')) {
+        local $opt{'usev6'} = 'cmdv6';
+        printf "use=cmdv6, cmdv6=%s address is %s\n", opt('cmdv6'), get_ipv6('cmdv6') // 'NOT FOUND';
     }
 
     exit 0 unless opt('debug');
@@ -2255,7 +2255,7 @@ USE_CURL_WITH_HEADERS
 
             if (!$reply) {
                 # don't include ${url} as that might expose login credentials
-                warning("curl (w/headers) cannot connect to https://${server}");
+                warning("curl (w/headers) cannot connect to https://%s using IPv%s",${server},$ipversion);
             }
         } else {
             my $timeout  = opt('timeout');
@@ -2280,7 +2280,7 @@ USE_CURL_WITH_HEADERS
 USE_CURL
             if (!$reply) {
                 # don't include ${url} as that might expose login credentials
-                warning("curl cannot connect to ${protocol}://${server}");
+                warning("curl cannot connect to %s://%s using IPv%s",${protocol},${server},$ipversion);
             }
         }    
     } else {
@@ -2537,16 +2537,31 @@ sub get_ipv6 {
     my ($ipv6, $arg, $reply, $url, $skip) = (undef, opt($usev6, $h), '');
     $arg = '' unless $arg;
 
-    if ($usev6 eq 'ip') {
-        $ipv6  = opt('ipv6', $h);
+    if ($usev6 eq 'ipv6' || $usev6 eq 'ip') {
+        if ($usev6 eq 'ip') {
+            warning("'usev6=ip' is deprecated. Use 'usev6=ipv6'");
+            $usev6 = 'ipv6';
+        }
+        $reply  = opt('ipv6', $h);
         $arg = 'ipv6';
 
-    } elsif ($usev6 eq 'if') {
+    } elsif ($usev6 eq 'ifv6' || $usev6 eq 'if' ) {
+        if ($usev6 eq 'if') {
+            warning("'usev6=if' is deprecated. Use 'usev6=ifv6'");
+            $usev6 = 'ifv6';
+        }
+        warning("'if-skip' is depreciated and does nothing for IPv6") if (opt('if-skip', $h));
         $reply = `command -v ip >/dev/null && ip -6 -o addr show dev $arg scope global 2>/dev/null | grep -v "deprecated" | grep -v "temporary"`;
         $reply = `command -v ifconfig >/dev/null && ifconfig $arg 2>/dev/null | grep -w "inet6" | grep -v "deprecated" | grep -v "temporary"` if $?;
         $reply = '' if $?;
+        $ipv6 = ipv6_extract_gua($reply);
 
-    }  elsif ($usev6 eq 'cmd') {
+    }  elsif ($usev6 eq 'cmdv6' || $usev6 eq 'cmd') {
+        if ($usev6 eq 'cmd') {
+            warning("'usev6=cmd' is deprecated. Use 'usev6=cmdv6'");
+            $usev6 = 'cmdv6';
+        }
+        warning("'cmd-skip' is depreciated and does nothing for IPv6") if (opt('cmd-skip', $h));
         $arg = opt('cmdv6', $h);
         if ($arg) {
             debug("GetIPv6 cmd: %s",$arg);
@@ -2554,7 +2569,12 @@ sub get_ipv6 {
             $reply = '' if $?;
         }
 
-    } elsif ($usev6 eq 'web') {
+    } elsif ($usev6 eq 'webv6' || $usev6 eq 'web') {
+        if ($usev6 eq 'web') {
+            warning("'usev6=web' is deprecated. Use 'usev6=webv6'");
+            $usev6 = 'webv6';
+        }
+        warning("'web-skip' does nothing for IPv6. Use 'webv6-skip'") if (opt('web-skip', $h));
         $url  = opt('webv6', $h)       || '';
         $skip = opt('webv6-skip', $h)  || '';
         if (exists $builtinweb{$url}) {
@@ -2564,11 +2584,34 @@ sub get_ipv6 {
         $arg = $url;
         if ($url) {
             # when using a web server to find our IPv6 address we should force use of IPv6
-            $reply = geturl({proxy => opt('proxy'), url => $url, ipversion => 6}) || '';
+            $reply = geturl({proxy => opt('proxy'),
+                             url => $url,
+                             ipversion => 6}
+                            ) || '';
         }
 
-    } elsif ($usev6 eq 'no') {
+    } elsif ($usev6 eq 'cisco') {
+        warning("'usev6=cisco' is not implemented and does nothing");
         $reply = '';
+
+    } elsif ($usev6 eq 'cisco-asa') {
+        warning("'usev6=cisco-asa' is not implemented and does nothing");
+        $reply = '';
+
+    } elsif ($usev6 eq 'disabled' || $usev6 eq 'no') {
+        warning("'usev6=no' is deprecated. Use 'usev6=disabled'") if ($usev6 eq 'no');
+        $reply = '';
+
+    } else {
+        if ($usev6 eq 'fw') {
+            warning("'usev6=fw' is deprecated. Use 'usev6=fwv6'");
+            $usev6 = 'fwv6';
+        }
+        warning("'fw-skip' does nothing for IPv6. Use 'usev6=fwv6-skip '") if (opt('fw-skip', $h));
+
+        warning("'usev6=%s' is not implemented and does nothing", $usev6);
+        $reply = '';
+
     }
 
     if (!defined $reply) {
@@ -2580,26 +2623,9 @@ sub get_ipv6 {
         $reply =~ s/^.*?${skip}//is;
     }
 
-    if ($usev6 eq 'if') {
-        # If we found the IPv6 address from a local interface then we
-        # filter for Global Unicast Address (GUA) as it would not be valid
-        # to try and update DNS with a link local or Unique Local (ULA) Address
-        if ($reply =~ /^.*? ([23][a-f0-9]{3}:[a-f0-9:]+:[a-f0-9]{1,4})[\/| ].*/is) {
-            $ipv6 = $1;
-        } else {
-            $ipv6 = '';
-        }
-    } else {
-        # We found IPv6 address from some method other than local interface
-        # so extract IPv6 address from the text
-        if ($reply =~ /(?i)(?<![:.\w])(?:[A-F0-9]{1,4}:){7}[A-F0-9]{1,4}(?![:.\w])/) {
-            $ipv6 = $&;
-        } elsif ($reply =~ /^.*?\b([a-f0-9]{1,4}:[a-f0-9:]+:[a-f0-9]{1,4})\b.*/is) {
-            $ipv6 = $1;
-        }
-    }
-
-    if (($usev6 ne 'ip') && (($ipv6 // '') eq '::')) {
+    $ipv6 //= ipv6_extract($reply);
+    warning("did not find IPv6 address") if !defined($ipv6);
+    if (($usev6 ne 'ipv6') && (($ipv6 // '') eq '::')) {
         $ipv6 = undef;
     }
 
