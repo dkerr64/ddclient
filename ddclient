@@ -2080,13 +2080,18 @@ sub check_value {
         $value = lc $value;
         return undef if !exists $ip_strategies{$value};
 
+    } elsif ($type eq T_USEV4) {
+        $value = lc $value;
+        return undef if ! exists $ipv4_strategies{$value};
+
     } elsif ($type eq T_USEV6) {
         $value = lc $value;
         return undef if ! exists $ipv6_strategies{$value};
+
     } elsif ($type eq T_FILE) {
         return undef if $value eq "";
 
-    } elsif ($type eq T_IF) {
+    } elsif ($type eq T_IF || $type eq T_IFV4 || $type eq T_IFV6) {
         return undef if $value !~ /^[a-zA-Z0-9:._-]+$/;
 
     } elsif ($type eq T_PROG) {
