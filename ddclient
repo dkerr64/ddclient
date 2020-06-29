@@ -392,9 +392,9 @@ my %variables = (
         'fw'                  => setv(T_ANY,   0, 0, 1, '',                   undef),
         'fw-skip'             => setv(T_STRING,1, 0, 1, '',                   undef),
         'fwv4'                => setv(T_ANY,   0, 0, 1, '',                   undef),
-#        'fwv4-skip'           => setv(T_STRING,1, 0, 1, '',                   undef),
+        'fwv4-skip'           => setv(T_STRING,1, 0, 1, '',                   undef),
         'fwv6'                => setv(T_ANY,   0, 0, 1, '',                   undef),
-#        'fwv6-skip'           => setv(T_STRING,1, 0, 1, '',                   undef),
+        'fwv6-skip'           => setv(T_STRING,1, 0, 1, '',                   undef),
         'fw-login'            => setv(T_LOGIN, 1, 0, 1, '',                   undef),
         'fw-password'         => setv(T_PASSWD,1, 0, 1, '',                   undef),
         'cmd'                 => setv(T_PROG,  0, 0, 1, '',                   undef),
@@ -446,9 +446,9 @@ my %variables = (
         'fw'                  => setv(T_ANY,   0, 0, 1, '',                   undef),
         'fw-skip'             => setv(T_STRING,0, 0, 1, '',                   undef),
         'fwv4'                => setv(T_ANY,   0, 0, 1, '',                   undef),
-#        'fwv4-skip'           => setv(T_STRING,0, 0, 1, '',                   undef),
+        'fwv4-skip'           => setv(T_STRING,0, 0, 1, '',                   undef),
         'fwv6'                => setv(T_ANY,   0, 0, 1, '',                   undef),
-#        'fwv6-skip'           => setv(T_STRING,0, 0, 1, '',                   undef),
+        'fwv6-skip'           => setv(T_STRING,0, 0, 1, '',                   undef),
         'fw-login'            => setv(T_LOGIN, 0, 0, 1, '',                   undef),
         'fw-password'         => setv(T_PASSWD,0, 0, 1, '',                   undef),
         'cmd'                 => setv(T_PROG,  0, 0, 1, '',                   undef),
@@ -865,9 +865,9 @@ my @opt = (
     [ "fw",          "=s", "-fw address|url       : depreciated, use 'fwv4' or 'fwv6'" ],
     [ "fw-skip",     "=s", "-fw-skip pattern      : depreciated, use 'fwv4-skip' or 'fwv6-skip'" ],
     [ "fwv4",        "=s", "-fwv4 address|url     : obtain IPv4 address from firewall at 'address' or 'url'" ],
-#    [ "fwv4-skip",   "=s", "-fwv4-skip pattern    : skip any IPv4 addresses before 'pattern' on the firewall address|url" ],
+    [ "fwv4-skip",   "=s", "-fwv4-skip pattern    : skip any IPv4 addresses before 'pattern' on the firewall address|url" ],
     [ "fwv6",        "=s", "-fwv6 address|url     : obtain IPv6 address from firewall at 'address' or 'url'" ],
-#    [ "fwv6-skip",   "=s", "-fwv6-skip pattern    : skip any IPv6 addresses before 'pattern' on the firewall address|url" ],
+    [ "fwv6-skip",   "=s", "-fwv6-skip pattern    : skip any IPv6 addresses before 'pattern' on the firewall address|url" ],
     [ "fw-login",    "=s", "-fw-login login       :   use 'login' when getting IP from fw" ],
     [ "fw-password", "=s", "-fw-password secret   :   use password 'secret' when getting IP from fw" ],
     "",
@@ -1625,6 +1625,7 @@ sub process_args {
 sub test_possible_ip {
     local $opt{'debug'} = 0;
 
+    printf "Test_possible_ip with 'get_ip'\r\n";
     printf "use=ip, ip=%s address is %s\n", opt('ip'), get_ip('ip') // 'NOT FOUND'
         if defined opt('ip');
 
@@ -1669,7 +1670,41 @@ sub test_possible_ip {
         printf "use=cmd, cmd=%s address is %s\n", opt('cmd'), get_ip('cmd') // 'NOT FOUND';
     }
 
-    # Now for IPv6
+    # Now force IPv4
+    printf "Test_possible_ip with 'get_ipv4'\r\n";
+    printf "use=ipv4, ipv4=%s address is %s\n", opt('ipv4'), get_ipv4('ipv4') // 'NOT FOUND'
+        if defined opt('ipv4');
+
+    {
+        # Note: The `ip` command adds a `@eth0` suffix to the names of VLAN
+        # interfaces. That `@eth0` suffix is NOT part of the interface name.
+        my @ifs = map({ /^[^\s:]*:\s*([^\s:@]+)/ ? $1 : () }
+                      `command -v ip >/dev/null && ip -o link show`);
+        @ifs = map({ /^([a-zA-Z].*?)(?::?\s.*)?$/ ? $1 : () }
+                   `command -v ifconfig >/dev/null && ifconfig -a`) if $? || !@ifs;
+        @ifs = () if $?;
+        warning("failed to get list of interfaces") if !@ifs;
+        foreach my $if (@ifs) {
+            local $opt{'ifv4'} = $if;
+            printf "use=ifv4, ifv4=%s address is %s\n", opt('ifv4'), get_ipv4('ifv4') // 'NOT FOUND';
+        }
+    }
+    {
+        local $opt{'usev4'} = 'webv4';
+        foreach my $web (sort keys %builtinweb) {
+            local $opt{'webv4'} = $web;
+            printf "use=webv4, webv4=$web address is %s\n", get_ipv4('webv4') // 'NOT FOUND';
+        }
+        printf "use=webv4, webv4=%s address is %s\n", opt('webv4'), get_ipv4('webv4') // 'NOT FOUND'
+            if ! exists $builtinweb{opt('webv4')};
+    }
+    if (opt('cmdv4')) {
+        local $opt{'usev4'} = 'cmdv4';
+        printf "use=cmdv4, cmdv4=%s address is %s\n", opt('cmdv4'), get_ipv4('cmdv4') // 'NOT FOUND';
+    }
+
+    # Now force IPv6
+    printf "Test_possible_ip with 'get_ipv6'\r\n";
     printf "use=ipv6, ipv6=%s address is %s\n", opt('ipv6'), get_ipv6('ipv6') // 'NOT FOUND'
         if defined opt('ipv6');
 
@@ -2417,7 +2452,11 @@ sub get_ip {
     $arg = '' unless $arg;
 
     if ($use eq 'ip') {
-        $reply  = opt('ip', $h);
+        $ip  = opt('ip', $h);
+        if (!is_ipv4($ip) && !is_ipv6($ip)) {
+            warning("'%s' is not a valid IPv4 or IPv6 address, ignoring value.",$ip);
+            $ip = undef;
+        }
         $arg = 'ip';
 
     } elsif ($use eq 'if') {
@@ -2444,8 +2483,7 @@ sub get_ip {
         $arg = $url;
 
         if ($url) {
-            # when using a web server to find public IPv4 address we should force use of IPv4
-            $reply = geturl({ proxy => opt('proxy', $h), url => $url, ipversion => 4 }) || '';
+            $reply = geturl({ proxy => opt('proxy', $h), url => $url }) || '';
         }
 
     } elsif (($use eq 'cisco')) {
@@ -2490,9 +2528,6 @@ sub get_ip {
         }) || '';
         $arg = $url;
 
-    } elsif ($use eq 'no') {
-        $reply = '0.0.0.0';
-
     } else {
         $url  = opt('fw',      $h) || '';
         $skip = opt('fw-skip', $h) || '';
@@ -2518,7 +2553,7 @@ sub get_ip {
         $skip  =~ s/ /\\s/is;
         $reply =~ s/^.*?${skip}//is;
     }
-    $ip //= ipv4_extract($reply) // ipv6_extract($reply);
+    $ip //= extract_ipv4($reply) // extract_ipv6($reply);
     warning("found neither IPv4 nor IPv6 address") if !defined($ip);
     if ($use ne 'ip' && ($ip // '') eq '0.0.0.0') {
         $ip = undef;
@@ -2529,40 +2564,171 @@ sub get_ip {
 }
 
 ######################################################################
+## get_ipv4
+######################################################################
+sub get_ipv4 {
+    my $usev4 = lc shift;
+    my $h   = shift;
+    my $ipv4 = undef;
+    my $reply = '';
+    my $url = '';
+    my $skip = '';
+    my $arg = opt($usev4, $h) // '';
+
+    if ($usev4 eq 'ipv4') {
+        $ipv4  = $arg;
+        if (!is_ipv4($ipv4)) {
+            warning("'%s' is not a valid IPv4, ignoring value.",$ipv4);
+            $ipv4 = undef;
+        }
+        $arg = 'ipv4';
+
+    } elsif ($usev4 eq 'ifv4') {
+        warning("'if-skip' is depreciated and does nothing for IPv4") if (opt('if-skip', $h));
+        $reply = `command -v ip >/dev/null && ip -4 -o addr show dev $arg scope global 2>/dev/null`;
+        $reply = `command -v ifconfig >/dev/null && ifconfig $arg 2>/dev/null | grep -w "inet"` if $?;
+        $reply = '' if $?;
+
+    } elsif ($usev4 eq 'cmdv4') {
+        warning("'cmd-skip' is depreciated and does nothing for IPv4") if (opt('cmd-skip', $h));
+        if ($arg) {
+            debug("GetIPv4 cmd: %s",$arg);
+            $reply = `$arg`;
+            $reply = '' if $?;
+        }
+
+    } elsif ($usev4 eq 'webv4') {
+        $url = $arg;
+        $skip = opt('webv4-skip', $h) // '';
+        if (exists $builtinweb{$url}) {
+            $skip = $builtinweb{$url}->{'skip'} unless $skip;
+            $url  = $builtinweb{$url}->{'url'};
+            $arg  = $url;
+        }
+        if ($url) {
+            # when using a URL to find IPv4 address we should force use of IPv4
+            $reply = geturl({ proxy => opt('proxy', $h),
+                url => $url,
+                ipversion => 4
+            }) // '';
+        }
+
+    } elsif ($usev4 eq 'cisco' || $usev4 eq 'cisco-asa') {
+        # Stuff added to support Cisco router ip http or ASA https daemon
+        # User fw-login should only have level 1 access to prevent
+        # password theft.  This is pretty harmless.
+        warning("'if' does nothing for IPv4. Use 'ifv4'") if (opt('if', $h));
+        warning("'fw' does nothing for IPv4. Use 'fwv4'") if (opt('fw', $h));
+        warning("'fw-skip' does nothing for IPv4. Use 'fwv4-skip'") if (opt('fw-skip', $h));
+        my $queryif = opt('ifv4', $h) // opt('if', $h);
+        $skip = opt('fwv4-skip', $h) // opt('fw-skip', $h) // '';
+        # Convert slashes to protected value "\/"
+        $queryif =~ s%\/%\\\/%g;
+        # Protect special HTML characters (like '?')
+        $queryif =~ s/([\?&= ])/sprintf("%%%02x", ord($1))/ge;
+        if ($usev4 eq 'cisco') {
+            $url = "http://" . (opt('fwv4', $h) // opt('fw', $h)) . "/level/1/exec/show/ip/interface/brief/${queryif}/CR";
+        } else {
+            $url = "https://" . (opt('fwv4', $h) // opt('fw', $h))  . "/exec/show%20interface%20${queryif}";
+        }
+        $arg = $url;
+        # when using a URL to find IPv4 address we should force use of IPv4
+        $reply = geturl({
+            url => $url,
+            login => opt('fw-login', $h),
+            password => opt('fw-password', $h),
+            ipversion => 4
+        }) // '';
+
+    } elsif ($usev4 eq 'disabled') {
+        $reply = '';
+
+    } else {
+        warning("'fw' does nothing for IPv4. Use 'fwv4'") if (opt('fw', $h));
+        warning("'fw-skip' does nothing for IPv4. Use 'fwv4-skip'") if (opt('fw-skip', $h));
+        $url  = opt('fwv4', $h) // opt('fw', $h) // '';
+        $skip = opt('fwv4-skip', $h) // opt('fw-skip', $h) // '';
+
+        if (exists $builtinfw{$usev4}) {
+            $skip = $builtinfw{$usev4}->{'skip'} unless $skip;
+            $url  = "http://${url}" . $builtinfw{$usev4}->{'url'} unless $url =~ /\//;
+        }
+        $arg = $url;
+        if ($url) {
+            # when using a URL to find IPv4 address we should force use of IPv4
+            $reply = geturl({
+                url => $url,
+                login => opt('fw-login', $h),
+                password => opt('fw-password', $h),
+                ipversion => 4
+            }) // '';
+        }
+    }
+
+    if (!defined $reply) {
+        $reply = '0.0.0.0';
+    }
+
+    if ($skip) {
+        $skip  =~ s/ /\\s/is;
+        $reply =~ s/^.*?${skip}//is;
+    }
+
+    $ipv4 //= extract_ipv4($reply);
+    warning("did not find IPv4 address") if !defined($ipv4);
+    if (($usev4 ne 'ipv4') && (($ipv4 // '') eq '0.0.0.0')) {
+        $ipv4 = undef;
+    }
+
+    debug("get_ipv4: using (%s, %s) reports %s", $usev4, $arg, $ipv4 // "<undefined>");
+    return $ipv4;
+}
+
+######################################################################
 ## get_ipv6
 ######################################################################
 sub get_ipv6 {
     my $usev6 = lc shift;
     my $h = shift;
-    my ($ipv6, $arg, $reply, $url, $skip) = (undef, opt($usev6, $h), '');
-    $arg = '' unless $arg;
+    my $ipv6 = undef;
+    my $reply = '';
+    my $url = '';
+    my $skip = '';
+    my $arg = opt($usev6, $h) // '';
 
     if ($usev6 eq 'ipv6' || $usev6 eq 'ip') {
         if ($usev6 eq 'ip') {
             warning("'usev6=ip' is deprecated. Use 'usev6=ipv6'");
             $usev6 = 'ipv6';
+            $arg = opt($usev6, $h) // $arg;
         }
-        $reply  = opt('ipv6', $h);
+        $ipv6 = $arg;
+        if (!is_ipv6($ipv6)) {
+            warning("'%s' is not a valid IPv6, ignoring value.",$ipv6);
+            $ipv6 = undef;
+        }
         $arg = 'ipv6';
 
     } elsif ($usev6 eq 'ifv6' || $usev6 eq 'if' ) {
         if ($usev6 eq 'if') {
             warning("'usev6=if' is deprecated. Use 'usev6=ifv6'");
             $usev6 = 'ifv6';
+            $arg = opt($usev6, $h) // $arg;
         }
         warning("'if-skip' is depreciated and does nothing for IPv6") if (opt('if-skip', $h));
         $reply = `command -v ip >/dev/null && ip -6 -o addr show dev $arg scope global 2>/dev/null | grep -v "deprecated" | grep -v "temporary"`;
         $reply = `command -v ifconfig >/dev/null && ifconfig $arg 2>/dev/null | grep -w "inet6" | grep -v "deprecated" | grep -v "temporary"` if $?;
         $reply = '' if $?;
-        $ipv6 = ipv6_extract_gua($reply);
+        $ipv6 = extract_ipv6_gua($reply);
+        $reply = ''; ## must empty this so that a non-GUA is not extracted later.
 
     }  elsif ($usev6 eq 'cmdv6' || $usev6 eq 'cmd') {
         if ($usev6 eq 'cmd') {
             warning("'usev6=cmd' is deprecated. Use 'usev6=cmdv6'");
             $usev6 = 'cmdv6';
+            $arg = opt($usev6, $h) // $arg;
         }
         warning("'cmd-skip' is depreciated and does nothing for IPv6") if (opt('cmd-skip', $h));
-        $arg = opt('cmdv6', $h);
         if ($arg) {
             debug("GetIPv6 cmd: %s",$arg);
             $reply = `$arg`;
@@ -2573,29 +2739,26 @@ sub get_ipv6 {
         if ($usev6 eq 'web') {
             warning("'usev6=web' is deprecated. Use 'usev6=webv6'");
             $usev6 = 'webv6';
+            $arg = opt($usev6, $h) // $arg;
         }
         warning("'web-skip' does nothing for IPv6. Use 'webv6-skip'") if (opt('web-skip', $h));
-        $url  = opt('webv6', $h)       || '';
-        $skip = opt('webv6-skip', $h)  || '';
+        $url = $arg;
+        $skip = opt('webv6-skip', $h) // '';
         if (exists $builtinweb{$url}) {
             $skip = $builtinweb{$url}->{'skip'} unless $skip;
             $url  = $builtinweb{$url}->{'url'};
+            $arg  = $url;
         }
-        $arg = $url;
         if ($url) {
-            # when using a web server to find our IPv6 address we should force use of IPv6
+            # when using a URL to find IPv6 address we should force use of IPv6
             $reply = geturl({proxy => opt('proxy'),
-                             url => $url,
-                             ipversion => 6}
-                            ) || '';
+                url => $url,
+                ipversion => 6
+            }) // '';
         }
 
-    } elsif ($usev6 eq 'cisco') {
-        warning("'usev6=cisco' is not implemented and does nothing");
-        $reply = '';
-
-    } elsif ($usev6 eq 'cisco-asa') {
-        warning("'usev6=cisco-asa' is not implemented and does nothing");
+    } elsif ($usev6 eq 'cisco' || $usev6 eq 'cisco-asa') {
+        warning("'usev6=cisco' and 'usev6=cisco-asa' are not implemented and do nothing");
         $reply = '';
 
     } elsif ($usev6 eq 'disabled' || $usev6 eq 'no') {
@@ -2603,12 +2766,6 @@ sub get_ipv6 {
         $reply = '';
 
     } else {
-        if ($usev6 eq 'fw') {
-            warning("'usev6=fw' is deprecated. Use 'usev6=fwv6'");
-            $usev6 = 'fwv6';
-        }
-        warning("'fw-skip' does nothing for IPv6. Use 'usev6=fwv6-skip '") if (opt('fw-skip', $h));
-
         warning("'usev6=%s' is not implemented and does nothing", $usev6);
         $reply = '';
 
@@ -2623,7 +2780,7 @@ sub get_ipv6 {
         $reply =~ s/^.*?${skip}//is;
     }
 
-    $ipv6 //= ipv6_extract($reply);
+    $ipv6 //= extract_ipv6($reply);
     warning("did not find IPv6 address") if !defined($ipv6);
     if (($usev6 ne 'ipv6') && (($ipv6 // '') eq '::')) {
         $ipv6 = undef;
@@ -2640,18 +2797,19 @@ sub get_ipv6 {
 ######################################################################
 sub is_ipv4 {
     my ($value) = @_;
-    return (length($value // '') != 0) && ($value eq (ipv4_extract($value) // ''));
+    return (length($value // '') != 0) && ($value eq (extract_ipv4($value) // ''));
 }
 
 ######################################################################
-## ipv4_extract() extracts the first valid IPv4 address from given string.
+## extract_ipv4() extracts the first valid IPv4 address from given string.
 ## Accepts leading zeros in the address but removes them in returned value
 ######################################################################
-sub ipv4_extract{
-    (shift // '') =~ /\b((?:(?<octet>25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3} ## first three bytes
-                         (?&octet))\b/xa;                               ## last one (without period)
-    my $ip = ($1 // '');
-    $ip =~ s/\b0+\B//g;                                                 ## remove leading zeros
+sub extract_ipv4{
+    if ((shift // '') !~ /\b((?:(?<octet>25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}
+                         (?&octet))\b/xa) {
+        return undef;
+    }
+    (my $ip = $1) =~ s/\b0+\B//g; ## remove embedded leading zeros
     return $ip;
 }
 
@@ -2661,17 +2819,17 @@ sub ipv4_extract{
 ######################################################################
 sub is_ipv6 {
     my ($value) = @_;
-    return (length($value // '') != 0) && ($value eq (ipv6_extract($value) // ''));
+    return (length($value // '') != 0) && ($value eq (extract_ipv6($value) // ''));
 }
 
 ######################################################################
-## ipv6_extract() extracts the first valid IPv6 address from given string
+## extract_ipv6() extracts the first valid IPv6 address from given string
 ## IPv6 must be in standard or compressed format.
 ## Mixed IPv6/IPv4 not supported.
 ## Accepts leading zeros in the address but removes them in returned value
 ######################################################################
-sub ipv6_extract{
-    (shift // '') =~ /(?<![:.\w])                                     ## Negative lookbehind for word boundry
+sub extract_ipv6{
+    if ((shift // '') !~ /(?<![:.\w])                                 ## Negative lookbehind for word boundry
                       ( (?:[0-9A-F]{1,4}:){7}[0-9A-F]{1,4}            ## Is in standard format
                        |(?=(?:[0-9A-F]{0,4}:){0,7}[0-9A-F]{0,4}       ## OR compressed with at most 7 colons
                         (?![:.\w]))                                   ##   and negative lookahead for boundry
@@ -2679,20 +2837,21 @@ sub ipv6_extract{
                        |(?:[0-9A-F]{1,4}:){7}:                        ## OR compressed with 8 colons (double at end)
                        |:(?::[0-9A-F]{1,4}){7}                        ## OR compressed with 8 colons (double at front)
                       )                                               ## End of first capture group
-                      (?![:.\w])/xai;                                 ## Negative lookahead for boundry
-    my $ip = ($1 // '');
-    $ip =~ s/\b0+\B//g;                                               ## remove leading zeros
+                      (?![:.\w])/xai) {                               ## Negative lookahead for boundry
+        return undef;
+    }
+    (my $ip = $1) =~ s/\b0+\B//g; ## remove embedded leading zeros
     return $ip;
 }
 
 ######################################################################
-## ipv6_extract_gua() extracts the first valid IPv6 Global Unicast Address (GUA)
+## extract_ipv6_gua() extracts the first valid IPv6 Global Unicast Address (GUA)
 ## from given string. IPv6 must be in standard or compressed format.
 ## Mixed IPv6/IPv4 not supported.
 ## Accepts leading zeros in the address but removes them in returned value
 ######################################################################
-sub ipv6_extract_gua {
-    (shift // '') =~ /(?<![:.\w])                                     ## Negative lookbehind for word boundry
+sub extract_ipv6_gua {
+    if ((shift // '') !~ /(?<![:.\w])                                 ## Negative lookbehind for word boundry
                       ( [23][A-F0-9]{3}:                              ## Starts with 2xxx: or 3xxx:
                         (?:[0-9A-F]{1,4}:){6}[0-9A-F]{1,4}            ##   in standard format
                        |(?=[23][A-F0-9]{3}:                           ## OR starts with 2xxx: or 3xxx:
@@ -2702,9 +2861,10 @@ sub ipv6_extract_gua {
                        |[23][A-F0-9]{3}:                              ## OR starts with 2xxx: or 3xxx:
                         (?:[0-9A-F]{1,4}:){6}:                        ##    compressed with 8 colons (double at end)
                       )                                               ## End of first capture group
-                      (?![:.\w])/xai;                                 ## Negative lookahead for boundry
-    my $ip = ($1 // '');
-    $ip =~ s/\b0+\B//g;                                               ## remove leading zeros
+                      (?![:.\w])/xai) {                               ## Negative lookahead for boundry
+        return undef;
+    }
+    (my $ip = $1) =~ s/\b0+\B//g; ## remove embedded leading zeros
     return $ip;
 }
 
