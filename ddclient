@@ -2452,7 +2452,7 @@ sub get_ip {
     if ($use eq 'ip') {
         $ip  = opt('ip', $h);
         if (!is_ipv4($ip) && !is_ipv6($ip)) {
-            warning("'%s' is not a valid IPv4 or IPv6 address, ignoring value.",$ip);
+            warning("'%s' is not a valid IPv4 or IPv6 address",$ip);
             $ip = undef;
         }
         $arg = 'ip';
@@ -2576,7 +2576,7 @@ sub get_ipv4 {
     if ($usev4 eq 'ipv4') {
         $ipv4  = $arg;
         if (!is_ipv4($ipv4)) {
-            warning("'%s' is not a valid IPv4, ignoring value.",$ipv4);
+            warning("'%s' is not a valid IPv4",$ipv4);
             $ipv4 = undef;
         }
         $arg = 'ipv4';
@@ -2702,7 +2702,7 @@ sub get_ipv6 {
         }
         $ipv6 = $arg;
         if (!is_ipv6($ipv6)) {
-            warning("'%s' is not a valid IPv6, ignoring value.",$ipv6);
+            warning("'%s' is not a valid IPv6",$ipv6);
             $ipv6 = undef;
         }
         $arg = 'ipv6';
