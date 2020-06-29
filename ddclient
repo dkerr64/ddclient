@@ -301,15 +301,15 @@ my %builtinfw = (
 );
 
 my %ip_strategies = (
-    'no'        => ": depreciated, see 'usev4' and 'usev6'",
-    'ip'        => ": depreciated, see 'usev4' and 'usev6'",
-    'web'       => ": depreciated, see 'usev4' and 'usev6'",
-    'fw'        => ": depreciated, see 'usev4' and 'usev6'",
-    'if'        => ": depreciated, see 'usev4' and 'usev6'",
-    'cmd'       => ": depreciated, see 'usev4' and 'usev6'",
-    'cisco'     => ": depreciated, see 'usev4' and 'usev6'",
-    'cisco-asa' => ": depreciated, see 'usev4' and 'usev6'",
-    map { $_ => sprintf ": Built-in firewall %s depreciated, see 'usev4' and 'usev6'", $builtinfw{$_}->{'name'} } keys %builtinfw,
+    'no'        => ": deprecated, see 'usev4' and 'usev6'",
+    'ip'        => ": deprecated, see 'usev4' and 'usev6'",
+    'web'       => ": deprecated, see 'usev4' and 'usev6'",
+    'fw'        => ": deprecated, see 'usev4' and 'usev6'",
+    'if'        => ": deprecated, see 'usev4' and 'usev6'",
+    'cmd'       => ": deprecated, see 'usev4' and 'usev6'",
+    'cisco'     => ": deprecated, see 'usev4' and 'usev6'",
+    'cisco-asa' => ": deprecated, see 'usev4' and 'usev6'",
+    map { $_ => sprintf ": Built-in firewall %s deprecated, see 'usev4' and 'usev6'", $builtinfw{$_}->{'name'} } keys %builtinfw,
 );
 
 sub ip_strategies_usage {
@@ -332,15 +332,15 @@ sub ipv4_strategies_usage {
 }
 
 my %ipv6_strategies = (
-    'no'          => ": depreciated, use 'disabled'",
+    'no'          => ": deprecated, use 'disabled'",
     'disabled'    => ": do not obtain an IPv6 address for this host",
-    'ip'          => ": depreciated, use 'ipv6'",
+    'ip'          => ": deprecated, use 'ipv6'",
     'ipv6'        => ": obtain IPv6 from -ipv6 {address}",
-    'web'         => ": depreciated, use 'webv6'",
+    'web'         => ": deprecated, use 'webv6'",
     'webv6'       => ": obtain IPv6 from an IP discovery page on the web",
-    'if'          => ": depreciated, use 'ifv6'",
+    'if'          => ": deprecated, use 'ifv6'",
     'ifv6'        => ": obtain IPv6 from the -if {interface}",
-    'cmd'         => ": depreciated, use 'cmdv6'",
+    'cmd'         => ": deprecated, use 'cmdv6'",
     'cmdv6'       => ": obtain IPv6 from the -cmdv6 {external-command}",
     'fwv6'        => ": obtain IPv6 from the firewall specified by -fwv6 {type|address}",
     'ciscov6'     => ": obtain IPv6 from Cisco FW at the -fwv6 {address}",
@@ -837,31 +837,31 @@ my @opt = (
     [ "cache",       "=s", "-cache path           : record address used in 'path'" ],
     [ "pid",         "=s", "-pid path             : record process id in 'path' if daemonized" ],
     "",
-    [ "use",         "=s", "-use which            : depreciated, see 'usev4' and 'usev6'" ],
+    [ "use",         "=s", "-use which            : deprecated, see 'usev4' and 'usev6'" ],
     &ip_strategies_usage(),
     [ "usev4",       "=s", "-usev4 which          : how the should IPv4 address be obtained." ],
     &ipv4_strategies_usage(),
     [ "usev6",       "=s", "-usev6 which          : how the should IPv6 address be obtained." ],
     &ipv6_strategies_usage(),
     "",
-    [ "ip",          "=s", "-ip address           : depreciated, use 'ipv4' or 'ipv6'" ],
+    [ "ip",          "=s", "-ip address           : deprecated, use 'ipv4' or 'ipv6'" ],
     [ "ipv4",        "=s", "-ipv4 address         : set the IPv4 address to 'address'" ],
     [ "ipv6",        "=s", "-ipv6 address         : set the IPv6 address to 'address'" ],
     "",
-    [ "if",          "=s", "-if interface         : depreciated, use 'ifv4' or 'ifv6'" ],
+    [ "if",          "=s", "-if interface         : deprecated, use 'ifv4' or 'ifv6'" ],
     [ "ifv4",        "=s", "-ifv4 interface       : obtain IPv4 address from 'interface'" ],
     [ "ifv6",        "=s", "-ifv6 interface       : obtain IPv6 address from 'interface'" ],
-    [ "if-skip",     "=s", "-if-skip pattern      : depreciated, not required" ],
+    [ "if-skip",     "=s", "-if-skip pattern      : deprecated, not required" ],
     "",
-    [ "web",         "=s", "-web provider|url     : depreciated, use 'webv4' or 'webv6'" ],
-    [ "web-skip",    "=s", "-web-skip pattern     : depreciated, use 'webv4-skip' or 'webv6-skip'" ],
+    [ "web",         "=s", "-web provider|url     : deprecated, use 'webv4' or 'webv6'" ],
+    [ "web-skip",    "=s", "-web-skip pattern     : deprecated, use 'webv4-skip' or 'webv6-skip'" ],
     [ "webv4",       "=s", "-webv4 provider|url   : obtain IPv4 address from provider's IP checking page" ],
     [ "webv4-skip",  "=s", "-webv4-skip pattern   : skip any IPv4 addresses before 'pattern' on the web provider|url" ],
     [ "webv6",       "=s", "-webv6 provider|url   : obtain IPv6 address from provider's IP checking page" ],
     [ "webv6-skip",  "=s", "-webv6-skip pattern   : skip any IPv6 addresses before 'pattern' on the web provider|url" ],
     "",
-    [ "fw",          "=s", "-fw address|url       : depreciated, use 'fwv4' or 'fwv6'" ],
-    [ "fw-skip",     "=s", "-fw-skip pattern      : depreciated, use 'fwv4-skip' or 'fwv6-skip'" ],
+    [ "fw",          "=s", "-fw address|url       : deprecated, use 'fwv4' or 'fwv6'" ],
+    [ "fw-skip",     "=s", "-fw-skip pattern      : deprecated, use 'fwv4-skip' or 'fwv6-skip'" ],
     [ "fwv4",        "=s", "-fwv4 address|url     : obtain IPv4 address from firewall at 'address' or 'url'" ],
     [ "fwv4-skip",   "=s", "-fwv4-skip pattern    : skip any IPv4 addresses before 'pattern' on the firewall address|url" ],
     [ "fwv6",        "=s", "-fwv6 address|url     : obtain IPv6 address from firewall at 'address' or 'url'" ],
@@ -869,8 +869,8 @@ my @opt = (
     [ "fw-login",    "=s", "-fw-login login       :   use 'login' when getting IP from fw" ],
     [ "fw-password", "=s", "-fw-password secret   :   use password 'secret' when getting IP from fw" ],
     "",
-    [ "cmd",         "=s", "-cmd program          : depreciated, use 'cmdv4' or 'cmdv6'" ],
-    [ "cmd-skip",    "=s", "-cmd-skip pattern     : depreciated, filter in program wrapper script" ],
+    [ "cmd",         "=s", "-cmd program          : deprecated, use 'cmdv4' or 'cmdv6'" ],
+    [ "cmd-skip",    "=s", "-cmd-skip pattern     : deprecated, filter in program wrapper script" ],
     [ "cmdv4",       "=s", "-cmdv4 program        : obtain IPv6 address from by calling {program}" ],
     [ "cmdv6",       "=s", "-cmdv6 program        : obtain IPv6 address from by calling {program}" ],
     "",
@@ -2582,13 +2582,13 @@ sub get_ipv4 {
         $arg = 'ipv4';
 
     } elsif ($usev4 eq 'ifv4') {
-        warning("'if-skip' is depreciated and does nothing for IPv4") if (opt('if-skip', $h));
+        warning("'if-skip' is deprecated and does nothing for IPv4") if (opt('if-skip', $h));
         $reply = `command -v ip >/dev/null && ip -4 -o addr show dev $arg scope global 2>/dev/null`;
         $reply = `command -v ifconfig >/dev/null && ifconfig $arg 2>/dev/null | grep -w "inet"` if $?;
         $reply = '' if $?;
 
     } elsif ($usev4 eq 'cmdv4') {
-        warning("'cmd-skip' is depreciated and does nothing for IPv4") if (opt('cmd-skip', $h));
+        warning("'cmd-skip' is deprecated and does nothing for IPv4") if (opt('cmd-skip', $h));
         if ($arg) {
             debug("GetIPv4 cmd: %s",$arg);
             $reply = `$arg`;
@@ -2713,7 +2713,7 @@ sub get_ipv6 {
             $usev6 = 'ifv6';
             $arg = opt($usev6, $h) // $arg;
         }
-        warning("'if-skip' is depreciated and does nothing for IPv6") if (opt('if-skip', $h));
+        warning("'if-skip' is deprecated and does nothing for IPv6") if (opt('if-skip', $h));
         $reply = `command -v ip >/dev/null && ip -6 -o addr show dev $arg scope global 2>/dev/null | grep -v "deprecated" | grep -v "temporary"`;
         $reply = `command -v ifconfig >/dev/null && ifconfig $arg 2>/dev/null | grep -w "inet6" | grep -v "deprecated" | grep -v "temporary"` if $?;
         $reply = '' if $?;
@@ -2726,7 +2726,7 @@ sub get_ipv6 {
             $usev6 = 'cmdv6';
             $arg = opt($usev6, $h) // $arg;
         }
-        warning("'cmd-skip' is depreciated and does nothing for IPv6") if (opt('cmd-skip', $h));
+        warning("'cmd-skip' is deprecated and does nothing for IPv6") if (opt('cmd-skip', $h));
         if ($arg) {
             debug("GetIPv6 cmd: %s",$arg);
             $reply = `$arg`;
