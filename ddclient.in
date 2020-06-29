@@ -2317,6 +2317,30 @@ sub extract_ipv6 {
 }
 
 ######################################################################
+## extract_ipv6_gua() extracts the first valid IPv6 Global Unicast Address (GUA)
+## from given string. IPv6 must be in standard or compressed format.
+## Mixed IPv6/IPv4 not supported.
+## Accepts leading zeros in the address but removes them in returned value
+######################################################################
+sub extract_ipv6_gua {
+    if ((shift // '') !~ /(?<![:.\w])                                 ## Negative lookbehind for word boundry
+                      ( [23][A-F0-9]{3}:                              ## Starts with 2xxx: or 3xxx:
+                        (?:[0-9A-F]{1,4}:){6}[0-9A-F]{1,4}            ##   in standard format
+                       |(?=[23][A-F0-9]{3}:                           ## OR starts with 2xxx: or 3xxx:
+                        (?:[0-9A-F]{0,4}:){0,6}[0-9A-F]{0,4}          ##   in compressed with at most 7 colons
+                        (?![:.\w]))                                   ##   and negative lookahead for boundry
+                        (?:(?:[0-9A-F]{1,4}:){1,7}|:)(?:(?::[0-9A-F]{1,4}){1,7}|:)  ## and only 1 double-colon
+                       |[23][A-F0-9]{3}:                              ## OR starts with 2xxx: or 3xxx:
+                        (?:[0-9A-F]{1,4}:){6}:                        ##    compressed with 8 colons (double at end)
+                      )                                               ## End of first capture group
+                      (?![:.\w])/xai) {                               ## Negative lookahead for boundry
+        return undef;
+    }
+    (my $ip = $1) =~ s/\b0+\B//g; ## remove embedded leading zeros
+    return $ip;
+}
+
+######################################################################
 ## group_hosts_by
 ######################################################################
 sub group_hosts_by {
