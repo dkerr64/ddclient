@@ -2267,7 +2267,7 @@ sub is_ipv4 {
 
 ######################################################################
 ## extract_ipv4() extracts the first valid IPv4 address from given string.
-## Accepts leading zeros in the address but removes them in returned value
+## Accepts leading zeros in the address but removes them in returned value.
 ######################################################################
 sub extract_ipv4 {
     (shift // '') =~ /\b((?:(?<octet>25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?&octet))\b/
@@ -2277,43 +2277,36 @@ sub extract_ipv4 {
 }
 
 ######################################################################
+## Regex to find IPv6 in standard or compressed format. Mixed IPv6/IPv4
+## not supported. Accepts leading zeros in the address. Adapted from
+## regex in Regular Expressions Cookbook by J.Goyvaerets and S.Levithan
+######################################################################
+my $regex_ipv6 = qr/(?<![:.0-9A-Z])            ## Negative lookbehind for word boundry
+    ( (?:[0-9A-F]{1,4}:){7}[0-9A-F]{1,4}       ## Is in standard format
+     |(?=(?:[0-9A-F]{0,4}:){0,7}[0-9A-F]{0,4}  ## OR compressed with at most 7 colons
+      (?![:.0-9A-Z]))                          ##   and negative lookahead for boundry
+      (?:(?:[0-9A-F]{1,4}:){1,7}|:)(?:(?::[0-9A-F]{1,4}){1,7}|:)  ## and only 1 double-colon
+     |(?:[0-9A-F]{1,4}:){7}:                   ## OR compressed with 8 colons (double at end)
+     |:(?::[0-9A-F]{1,4}){7}                   ## OR compressed with 8 colons (double at front)
+    )                                          ## End of first capture group
+    (?![:.0-9A-Z])/xi;                         ## Negative lookahead for boundry
+
+######################################################################
 ## is_ipv6() validates if string is valid IPv6 address with no preceding
-## or trailing spaces/characters.
+## or trailing spaces/characters, not even line breaks.
 ######################################################################
 sub is_ipv6 {
-    my ($value) = @_;
-    return (length($value // '') != 0) &&
-        ((extract_ipv6($value) // '') eq (($value =~ s/\b0+\B//g) ? $value : $value));
+    return ((shift // '') =~ /\A$regex_ipv6\z/) ne '';
 }
 
 ######################################################################
-## extract_ipv6() extracts the first valid IPv6 address from the given string.
-## Accepts leading zeros in the address but removes them in returned value.
+## extract_ipv6() finds the first valid IPv6 address in the given string,
+## removes embedded leading zeros, and returns the result.
 ######################################################################
 sub extract_ipv6 {
-    my $content = shift;
-    my $omits;
-    my $ip          = "";
-    my $linenumbers = 0;
-
-    my @values = split('\n', $content);
-    foreach my $val (@values) {
-        next unless $val =~ /((:{0,2}[A-F0-9]{1,4}){0,7}:{1,2}[A-F0-9]{1,4})/i; # invalid char
-        my $parsed = $1;
-
-        # check for at least 7 colons
-        my $count_colon = () = $parsed =~ /:/g;
-        if ($count_colon != 7) {
-            # or one double colon
-            my $count_double_colon = () = $parsed =~ /::/g;
-            if ($count_double_colon != 1) {
-                next
-            }
-        }
-        $parsed =~ s/\b0+\B//g; ## remove embedded leading zeros
-        return $parsed;
-    }
-    return;
+    (shift // '') =~ /$regex_ipv6/ or return undef;
+    (my $ip = $1) =~ s/\b0+\B//g; ## remove embedded leading zeros
+    return $ip;
 }
 
 ######################################################################
