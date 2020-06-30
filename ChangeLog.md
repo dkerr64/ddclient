@@ -8,9 +8,21 @@ repository history](https://github.com/ddclient/ddclient/commits/master).
 ### New features
 
   * Added support for OVH DynHost.
+  * Added support for ClouDNS.
+  * Added a build system to make it easier for distributions to package
+    ddclient:
+
+        ./autogen && ./configure && make && make check && make install
+
+  * The `freedns` protocol (for https://freedns.afraid.org) now supports IPv6
+    addresses.
 
 ### Bug fixes
 
+  * Minor `freedns` protocol fixes, including:
+      * You can now update an address that differs from the system's own.
+      * If multiple hosts are defined and one fails, ddclient will no longer
+        skip the remaining hosts.
   * Fixed a regression introduced in v3.9.0 that caused
     `use=ip,ip=<ipv4-address>` to fail.
   * "true" is now accepted as a boolean value.

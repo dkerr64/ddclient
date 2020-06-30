@@ -18,6 +18,7 @@
 #
 #
 ######################################################################
+package ddclient;
 require v5.10.1;
 use strict;
 use warnings;
@@ -25,16 +26,33 @@ use Getopt::Long;
 use Sys::Hostname;
 use IO::Socket;
 
-my $version  = "3.9.1";
+use version 0.77; our $VERSION = version->declare('v3.9.1');
+(my $version = $VERSION->stringify()) =~ s/^v//;
 my $programd = $0;
 $programd =~ s%^.*/%%;
 my $program = $programd;
 $program =~ s/d$//;
-my $now       = time;
-my $hostname  = hostname();
-my $etc       = ($program =~ /test/i) ? './'   : '/etc/ddclient/';
-my $cachedir  = ($program =~ /test/i) ? './'   : '/var/cache/ddclient/';
-my $savedir   = ($program =~ /test/i) ? 'URL/' : '/tmp/';
+my $now = time;
+my $hostname = hostname();
+
+# subst_var(subst, default) returns subst unless it looks like @foo@ in which case it returns
+# default. The @foo@ strings are expected to be replaced by make; this function makes it possible
+# to run this file as a Perl script before those substitutions are made.
+sub subst_var {
+    my ($subst, $default) = @_;
+    return $default if $subst =~ qr'^@\w+@$'a;
+    return $subst;
+}
+
+my $etc = subst_var('@sysconfdir@', '/etc/ddclient');
+my $cachedir = subst_var('@localstatedir@', '/var') . '/cache/ddclient';
+my $savedir = '/tmp';
+if ($program =~ /test/i) {
+    $etc = '.';
+    $cachedir = '.';
+    $savedir = 'URL';
+}
+
 my $msgs      = '';
 my $last_msgs = '';
 
@@ -47,6 +65,11 @@ local $file   = '';
 local $lineno = '';
 
 $ENV{'PATH'} = (exists($ENV{PATH}) ? "$ENV{PATH}:" : "") . "/sbin:/usr/sbin:/bin:/usr/bin:/etc:/usr/lib:";
+
+my ($result, %config, %globals, %cache);
+my $saved_cache;
+my %saved_opt;
+my $daemon;
 
 sub T_ANY    { 'any' }
 sub T_STRING { 'string' }
@@ -83,35 +106,60 @@ my %builtinweb = (
     'nsupdate.info'  => { 'url' => 'https://ipv6.nsupdate.info/myip', , },
 );
 my %builtinfw = (
-    'watchguard-soho' => {
-        'name' => 'Watchguard SOHO FW',
-        'url'  => '/pubnet.htm',
-        'skip' => 'NAME=IPAddress VALUE=',
+    '2wire' => {
+        'name' => '2Wire 1701HG Gateway',
+        'url'  => '/xslt?PAGE=B01',
+        'skip' => 'Internet Address:',
     },
-    'netopia-r910' => {
-        'name' => 'Netopia R910 FW',
-        'url'  => '/WanEvtLog',
-        'skip' => 'local:',
+    '3com-3c886a' => {
+        'name' => '3com 3c886a 56k Lan Modem',
+        'url'  => '/stat3.htm',
+        'skip' => 'IP address in use',
     },
-    'smc-barricade' => {
-        'name' => 'SMC Barricade FW',
-        'url'  => '/status.htm',
-        'skip' => 'IP Address',
+    '3com-oc-remote812' => {
+        'name' => '3com OfficeConnect Remote 812',
+        'url'  => '/callEvent',
+        'skip' => '.*LOCAL',
     },
-    'smc-barricade-alt' => {
-        'name' => 'SMC Barricade FW (alternate config)',
-        'url'  => '/status.HTM',
-        'skip' => 'WAN IP',
+    'alcatel-510' => {
+        'name' => 'Alcatel Speed Touch 510',
+        'url'  => '/cgi/ip/',
+        'skip' => 'ppp',
     },
-    'smc-barricade-7401bra' => {
-        'name' => 'SMC Barricade 7401BRA FW',
-        'url'  => '/admin/wan1.htm',
-        'skip' => 'IP Address',
+    'alcatel-stp' => {
+        'name' => 'Alcatel Speed Touch Pro',
+        'url'  => '/cgi/router/',
+        'skip' => 'Brt',
     },
-    'netgear-rt3xx' => {
-        'name' => 'Netgear FW',
-        'url'  => '/mtenSysStatus.html',
-        'skip' => 'IP Address',
+    'allnet-1298' => {
+        'name' => 'Allnet 1298',
+        'url'  => '/cgi/router/',
+        'skip' => 'WAN',
+    },
+    'cayman-3220h' => {
+        'name' => 'Cayman 3220-H DSL',
+        'url'  => '/shell/show+ip+interfaces',
+        'skip' => '.*inet',
+    },
+    'dlink-524' => {
+        'name' => 'D-Link DI-524',
+        'url'  => '/st_device.html',
+        'skip' => 'WAN.*?Addres',
+    },
+    'dlink-604' => {
+        'name' => 'D-Link DI-604',
+        'url'  => '/st_devic.html',
+        'skip' => 'WAN.*?IP.*Address',
+    },
+    'dlink-614' => {
+        'name' => 'D-Link DI-614+',
+        'url'  => '/st_devic.html',
+        'skip' => 'WAN',
+    },
+    'e-tech' => {
+        'name' => 'E-tech Router',
+        'url'  => '/Status.htm',
+        'skip' => 'Public IP Address',
     },
     'elsa-lancom-dsl10' => {
         'name' => 'ELSA LanCom DSL/10 DSL FW',
@@ -133,6 +181,16 @@ my %builtinfw = (
         'url'  => '/Status.htm',
         'skip' => 'WAN.*?Address',
     },
+    'linksys-rv042-wan1' => {
+        'name' => 'Linksys RV042 Dual Homed Router WAN Port 2',
+        'url'  => '/home.htm',
+        'skip' => 'WAN1 IP',
+    },
+    'linksys-rv042-wan2' => {
+        'name' => 'Linksys RV042 Dual Homed Router WAN Port 2',
+        'url'  => '/home.htm',
+        'skip' => 'WAN2 IP',
+    },
     'linksys-ver2' => {
         'name' => 'Linksys FW version 2',
         'url'  => '/RouterStatus.htm',
@@ -142,6 +200,11 @@ my %builtinfw = (
         'name' => 'Linksys FW version 3',
         'url'  => '/Status_Router.htm',
         'skip' => 'WAN.*?Address',
+    },
+    'linksys-wcg200' => {
+        'name' => 'Linksys WCG200 FW',
+        'url'  => '/RgStatus.asp',
+        'skip' => 'WAN.IP.*?Address',
     },
     'linksys-wrt854g' => {
         'name' => 'Linksys WRT854G FW',
@@ -158,145 +221,105 @@ my %builtinfw = (
         'url'  => '/MainPage?id=6',
         'skip' => 'ppp-0',
     },
-    '3com-3c886a' => {
-        'name' => '3com 3c886a 56k Lan Modem',
-        'url'  => '/stat3.htm',
-        'skip' => 'IP address in use',
-    },
-    'sohoware-nbg800' => {
-        'name' => 'SOHOWare BroadGuard NBG800',
-        'url'  => '/status.htm',
-        'skip' => 'Internet IP',
-    },
-    'xsense-aero' => {
-        'name' => 'Xsense Aero',
-        'url'  => '/A_SysInfo.htm',
-        'skip' => 'WAN.*?IP Address',
-    },
-    'alcatel-stp' => {
-        'name' => 'Alcatel Speed Touch Pro',
-        'url'  => '/cgi/router/',
-        'skip' => 'Brt',
-    },
-    'alcatel-510' => {
-        'name' => 'Alcatel Speed Touch 510',
-        'url'  => '/cgi/ip/',
-        'skip' => 'ppp',
-    },
-    'allnet-1298' => {
-        'name' => 'Allnet 1298',
-        'url'  => '/cgi/router/',
-        'skip' => 'WAN',
-    },
-    '3com-oc-remote812' => {
-        'name' => '3com OfficeConnect Remote 812',
-        'url'  => '/callEvent',
-        'skip' => '.*LOCAL',
-    },
-    'e-tech' => {
-        'name' => 'E-tech Router',
-        'url'  => '/Status.htm',
-        'skip' => 'Public IP Address',
-    },
-    'cayman-3220h' => {
-        'name' => 'Cayman 3220-H DSL',
-        'url'  => '/shell/show+ip+interfaces',
-        'skip' => '.*inet',
-    },
-    'vigor-2200usb' => {
-        'name' => 'Vigor 2200 USB',
-        'url'  => '/doc/online.sht',
-        'skip' => 'PPPoA',
-    },
-    'dlink-614' => {
-        'name' => 'D-Link DI-614+',
-        'url'  => '/st_devic.html',
-        'skip' => 'WAN',
-    },
-    'dlink-604' => {
-        'name' => 'D-Link DI-604',
-        'url'  => '/st_devic.html',
-        'skip' => 'WAN.*?IP.*Address',
-    },
-    'olitec-SX200' => {
-        'name' => 'olitec-SX200',
-        'url'  => '/doc/wan.htm',
-        'skip' => 'st_wan_ip[0] = "',
-    },
-    'westell-6100' => {
-        'name' => 'Westell C90-610015-06 DSL Router',
-        'url'  => '/advstat.htm',
-        'skip' => 'IP.+?Address',
-    },
-    '2wire' => {
-        'name' => '2Wire 1701HG Gateway',
-        'url'  => '/xslt?PAGE=B01',
-        'skip' => 'Internet Address:',
-    },
-    'linksys-rv042-wan1' => {
-        'name' => 'Linksys RV042 Dual Homed Router WAN Port 2',
-        'url'  => '/home.htm',
-        'skip' => 'WAN1 IP',
-    },
-    'linksys-rv042-wan2' => {
-        'name' => 'Linksys RV042 Dual Homed Router WAN Port 2',
-        'url'  => '/home.htm',
-        'skip' => 'WAN2 IP',
+    'netgear-dg834g' => {
+        'name' => 'netgear-dg834g',
+        'url'  => '/setup.cgi?next_file=s_status.htm&todo=cfg_init',
+        'skip' => '',
     },
     'netgear-rp614' => {
         'name' => 'Netgear RP614 FW',
         'url'  => '/sysstatus.html',
         'skip' => 'IP Address',
     },
-    'watchguard-edge-x' => {
-        'name' => 'Watchguard Edge X FW',
-        'url'  => '/netstat.htm',
-        'skip' => 'inet addr:',
-    },
-    'dlink-524' => {
-        'name' => 'D-Link DI-524',
-        'url'  => '/st_device.html',
-        'skip' => 'WAN.*?Addres',
-    },
-    'rtp300' => {
-        'name' => 'Linksys RTP300',
-        'url'  => '/cgi-bin/webcm?getpage=%2Fusr%2Fwww_safe%2Fhtml%2Fstatus%2FRouter.html',
-        'skip' => 'Internet.*?IP Address',
-    },
-    'netgear-wpn824' => {
-        'name' => 'Netgear WPN824 FW',
-        'url'  => '/RST_status.htm',
+    'netgear-rt3xx' => {
+        'name' => 'Netgear FW',
+        'url'  => '/mtenSysStatus.html',
         'skip' => 'IP Address',
-    },
-    'linksys-wcg200' => {
-        'name' => 'Linksys WCG200 FW',
-        'url'  => '/RgStatus.asp',
-        'skip' => 'WAN.IP.*?Address',
-    },
-    'netgear-dg834g' => {
-        'name' => 'netgear-dg834g',
-        'url'  => '/setup.cgi?next_file=s_status.htm&todo=cfg_init',
-        'skip' => '',
     },
     'netgear-wgt624' => {
         'name' => 'Netgear WGT624',
         'url'  => '/RST_st_dhcp.htm',
         'skip' => 'IP Address</B></td><TD NOWRAP width="50%">',
     },
-    'sveasoft' => {
-        'name' => 'Sveasoft WRT54G/WRT54GS',
-        'url'  => '/Status_Router.asp',
-        'skip' => 'var wan_ip',
+    'netgear-wpn824' => {
+        'name' => 'Netgear WPN824 FW',
+        'url'  => '/RST_status.htm',
+        'skip' => 'IP Address',
+    },
+    'netopia-r910' => {
+        'name' => 'Netopia R910 FW',
+        'url'  => '/WanEvtLog',
+        'skip' => 'local:',
+    },
+    'olitec-SX200' => {
+        'name' => 'olitec-SX200',
+        'url'  => '/doc/wan.htm',
+        'skip' => 'st_wan_ip[0] = "',
+    },
+    'rtp300' => {
+        'name' => 'Linksys RTP300',
+        'url'  => '/cgi-bin/webcm?getpage=%2Fusr%2Fwww_safe%2Fhtml%2Fstatus%2FRouter.html',
+        'skip' => 'Internet.*?IP Address',
+    },
+    'sitecom-dc202' => {
+        'name' => 'Sitecom DC-202 FW',
+        'url'  => '/status.htm',
+        'skip' => 'Internet IP Address',
+    },
+    'smc-barricade' => {
+        'name' => 'SMC Barricade FW',
+        'url'  => '/status.htm',
+        'skip' => 'IP Address',
     },
     'smc-barricade-7004vbr' => {
         'name' => 'SMC Barricade FW (7004VBR model config)',
         'url'  => '/status_main.stm',
         'skip' => 'var wan_ip=',
     },
-    'sitecom-dc202' => {
-        'name' => 'Sitecom DC-202 FW',
+    'smc-barricade-7401bra' => {
+        'name' => 'SMC Barricade 7401BRA FW',
+        'url'  => '/admin/wan1.htm',
+        'skip' => 'IP Address',
+    },
+    'smc-barricade-alt' => {
+        'name' => 'SMC Barricade FW (alternate config)',
+        'url'  => '/status.HTM',
+        'skip' => 'WAN IP',
+    },
+    'sohoware-nbg800' => {
+        'name' => 'SOHOWare BroadGuard NBG800',
         'url'  => '/status.htm',
-        'skip' => 'Internet IP Address',
+        'skip' => 'Internet IP',
+    },
+    'sveasoft' => {
+        'name' => 'Sveasoft WRT54G/WRT54GS',
+        'url'  => '/Status_Router.asp',
+        'skip' => 'var wan_ip',
+    },
+    'vigor-2200usb' => {
+        'name' => 'Vigor 2200 USB',
+        'url'  => '/doc/online.sht',
+        'skip' => 'PPPoA',
+    },
+    'watchguard-edge-x' => {
+        'name' => 'Watchguard Edge X FW',
+        'url'  => '/netstat.htm',
+        'skip' => 'inet addr:',
+    },
+    'watchguard-soho' => {
+        'name' => 'Watchguard SOHO FW',
+        'url'  => '/pubnet.htm',
+        'skip' => 'NAME=IPAddress VALUE=',
+    },
+    'westell-6100' => {
+        'name' => 'Westell C90-610015-06 DSL Router',
+        'url'  => '/advstat.htm',
+        'skip' => 'IP.+?Address',
+    },
+    'xsense-aero' => {
+        'name' => 'Xsense Aero',
+        'url'  => '/A_SysInfo.htm',
+        'skip' => 'WAN.*?IP Address',
     },
 );
 
@@ -356,7 +379,6 @@ sub setv {
         'type'     => shift,
         'required' => shift,
         'cache'    => shift,
-        'config'   => shift,
         'default'  => shift,
         'minimum'  => shift,
     };
@@ -470,252 +492,119 @@ my %variables = (
         'warned-min-error-interval' => setv(T_ANY, 0, 1, 0, 0,                undef),
     },
     'dyndns-common-defaults' => {
-        'static'              => setv(T_BOOL,  0, 1, 1, 0,                    undef),
-        'wildcard'            => setv(T_BOOL,  0, 1, 1, 0,                    undef),
-        'mx'                  => setv(T_OFQDN, 0, 1, 1, '',                   undef),
-        'backupmx'            => setv(T_BOOL,  0, 1, 1, 0,                    undef),
+        'static'              => setv(T_BOOL,  0, 1, 0,                    undef),
+        'wildcard'            => setv(T_BOOL,  0, 1, 0,                    undef),
+        'mx'                  => setv(T_OFQDN, 0, 1, '',                   undef),
+        'backupmx'            => setv(T_BOOL,  0, 1, 0,                    undef),
     },
     'easydns-common-defaults' => {
-        'wildcard'            => setv(T_BOOL,  0, 1, 1, 0,                    undef),
-        'mx'                  => setv(T_OFQDN, 0, 1, 1, '',                   undef),
-        'backupmx'            => setv(T_BOOL,  0, 1, 1, 0,                    undef),
+        'wildcard'            => setv(T_BOOL,  0, 1, 0,                    undef),
+        'mx'                  => setv(T_OFQDN, 0, 1, '',                   undef),
+        'backupmx'            => setv(T_BOOL,  0, 1, 0,                    undef),
     },
     'noip-common-defaults' => {
-        'static'              => setv(T_BOOL,  0, 1, 1, 0,                    undef),
+        'static'              => setv(T_BOOL,  0, 1, 0,                    undef),
     },
-    'noip-service-common-defaults' => {  ## TODO IPv6 (because 'ip' specified below)
-        'server'              => setv(T_FQDNP, 1, 0, 1, 'dynupdate.no-ip.com',undef),
-        'login'               => setv(T_LOGIN, 1, 0, 1, '',                   undef),
-        'password'            => setv(T_PASSWD,1, 0, 1, '',                   undef),
-        'host'                => setv(T_STRING,1, 1, 1, '',                   undef),
-        'ip'                  => setv(T_IP,    0, 1, 0, undef,                undef),
-        'ipv6'                => setv(T_IPV6,   0, 1, 0, undef,               undef),
-        'wtime'               => setv(T_DELAY, 0, 1, 1, 0,                    interval('30s')),
-        'mtime'               => setv(T_NUMBER,0, 1, 0, 0,                    undef),
-        'atime'               => setv(T_NUMBER,0, 1, 0, 0,                    undef),
-        'status'              => setv(T_ANY,   0, 1, 0, '',                   undef),
-        'min-interval'        => setv(T_DELAY, 0, 0, 1, interval('30s'),      0),
-        'max-interval'        => setv(T_DELAY, 0, 0, 1, interval('25d'),      0),
-        'min-error-interval'  => setv(T_DELAY, 0, 0, 1, interval('5m'),       0),
-        'warned-min-interval'       => setv(T_ANY, 0, 1, 0, 0,                undef),
-        'warned-min-error-interval' => setv(T_ANY, 0, 1, 0, 0,                undef),
+    'noip-service-common-defaults' => { ## TODO IPv6 (because 'ip' specified below)
+        'server'              => setv(T_FQDNP, 1, 0, 'dynupdate.no-ip.com',undef),
+        'login'               => setv(T_LOGIN, 1, 0, '',                   undef),
+        'password'            => setv(T_PASSWD,1, 0, '',                   undef),
+        'host'                => setv(T_STRING,1, 1, '',                   undef),
+        'ip'                  => setv(T_IP,    0, 1, undef,                undef),
+        'wtime'               => setv(T_DELAY, 0, 1, 0,                    interval('30s')),
+        'mtime'               => setv(T_NUMBER,0, 1, 0,                    undef),
+        'atime'               => setv(T_NUMBER,0, 1, 0,                    undef),
+        'status'              => setv(T_ANY,   0, 1, '',                   undef),
+        'min-interval'        => setv(T_DELAY, 0, 0, interval('30s'),      0),
+        'max-interval'        => setv(T_DELAY, 0, 0, interval('25d'),      0),
+        'min-error-interval'  => setv(T_DELAY, 0, 0, interval('5m'),       0),
+        'warned-min-interval'       => setv(T_ANY, 0, 1, 0,                undef),
+        'warned-min-error-interval' => setv(T_ANY, 0, 1, 0,                undef),
     },
     'zoneedit-service-common-defaults' => {
-        'zone'                => setv(T_OFQDN, 0, 0, 1, undef,                undef),
+        'zone'                => setv(T_OFQDN, 0, 0, undef,                undef),
     },
     'dtdns-common-defaults' => {
-        'login'               => setv(T_LOGIN, 0, 0, 0, 'unused',             undef),
-        'client'              => setv(T_STRING,0, 1, 1, $program,             undef),
+        'login'               => setv(T_LOGIN, 0, 0, 'unused',             undef),
+        'client'              => setv(T_STRING,0, 1, $program,             undef),
     },
     'nsupdate-common-defaults' => {
-        'ttl'                 => setv(T_NUMBER,0, 1, 0, 600,                  undef),
-        'zone'                => setv(T_STRING,1, 1, 1, '',                   undef),
-        'tcp'                 => setv(T_BOOL,  0, 1, 1, 0,                    undef),
+        'ttl'                 => setv(T_NUMBER,0, 1, 600,                  undef),
+        'zone'                => setv(T_STRING,1, 1, '',                   undef),
+        'tcp'                 => setv(T_BOOL,  0, 1, 0,                    undef),
     },
     'cloudflare-common-defaults' => {
-        'server'              => setv(T_FQDNP, 1, 0, 1, 'api.cloudflare.com/client/v4', undef),
-        'zone'                => setv(T_FQDN,  1, 0, 1, '',                   undef),
-        'login'               => setv(T_LOGIN, 0, 0, 1, 'token',              undef),
-        'static'              => setv(T_BOOL,  0, 1, 1, 0,                    undef),
-        'wildcard'            => setv(T_BOOL,  0, 1, 1, 0,                    undef),
-        'mx'                  => setv(T_OFQDN, 0, 1, 1, '',                   undef),
-        'backupmx'            => setv(T_BOOL,  0, 1, 1, 0,                    undef),
-        'ttl'                 => setv(T_NUMBER,1, 0, 1, 1,                    undef),
+        'server'              => setv(T_FQDNP, 1, 0, 'api.cloudflare.com/client/v4', undef),
+        'zone'                => setv(T_FQDN,  1, 0, '',                   undef),
+        'login'               => setv(T_LOGIN, 0, 0, 'token',              undef),
+        'static'              => setv(T_BOOL,  0, 1, 0,                    undef),
+        'wildcard'            => setv(T_BOOL,  0, 1, 0,                    undef),
+        'mx'                  => setv(T_OFQDN, 0, 1, '',                   undef),
+        'backupmx'            => setv(T_BOOL,  0, 1, 0,                    undef),
+        'ttl'                 => setv(T_NUMBER,1, 0, 1,                    undef),
     },
     'googledomains-common-defaults' => {
-        'server'              => setv(T_FQDNP, 1, 0, 1, 'domains.google.com', undef),
+        'server'              => setv(T_FQDNP, 1, 0, 'domains.google.com', undef),
     },
     'duckdns-common-defaults' => {
-        'server'              => setv(T_FQDNP, 1, 0, 1, 'www.duckdns.org',    undef),
-        'login'               => setv(T_LOGIN, 0, 0, 0, 'unused',             undef),
+        'server'              => setv(T_FQDNP, 1, 0, 'www.duckdns.org',    undef),
+        'login'               => setv(T_LOGIN, 0, 0, 'unused',             undef),
     },
     'he-common-defaults'      => {
         'server'              => setv(T_FQDNP, 1, 0, 1, 'dyn.dns.he.net',     undef),
     },
     'freemyip-common-defaults' => {
-        'server'              => setv(T_FQDNP, 1, 0, 1, 'freemyip.com',       undef),
-        'login'               => setv(T_LOGIN, 0, 0, 0, 'unused',             undef),
+        'server'              => setv(T_FQDNP, 1, 0, 'freemyip.com',       undef),
+        'login'               => setv(T_LOGIN, 0, 0, 'unused',             undef),
     },
     'woima-common-defaults' => {
-        'static'              => setv(T_BOOL,  0, 1, 1, 0,                    undef),
-        'wildcard'            => setv(T_BOOL,  0, 1, 1, 0,                    undef),
-        'mx'                  => setv(T_OFQDN, 0, 1, 1, '',                   undef),
-        'backupmx'            => setv(T_BOOL,  0, 1, 1, 0,                    undef),
-        'custom'              => setv(T_BOOL,  0, 1, 1, 0,                    undef),
-        'script'              => setv(T_STRING,1, 1, 1, '/nic/update',        undef),
+        'static'              => setv(T_BOOL,  0, 1, 0,                    undef),
+        'wildcard'            => setv(T_BOOL,  0, 1, 0,                    undef),
+        'mx'                  => setv(T_OFQDN, 0, 1, '',                   undef),
+        'backupmx'            => setv(T_BOOL,  0, 1, 0,                    undef),
+        'custom'              => setv(T_BOOL,  0, 1, 0,                    undef),
+        'script'              => setv(T_STRING,1, 1, '/nic/update',        undef),
     },
     'woima-service-common-defaults' => {  ## TODO IPv6 (because 'ip' specified below)
-        'server'              => setv(T_FQDNP, 1, 0, 1, 'dyn.woima.fi',       undef),
-        'login'               => setv(T_LOGIN, 1, 0, 1, '',                   undef),
-        'password'            => setv(T_PASSWD,1, 0, 1, '',                   undef),
-        'ip'                  => setv(T_IP,    0, 1, 0, undef,                undef),
-        'wtime'               => setv(T_DELAY, 0, 1, 1, 0,                    interval('30s')),
-        'mtime'               => setv(T_NUMBER,0, 1, 0, 0,                    undef),
-        'atime'               => setv(T_NUMBER,0, 1, 0, 0,                    undef),
-        'status'              => setv(T_ANY,   0, 1, 0, '',                   undef),
-        'min-interval'        => setv(T_DELAY, 0, 0, 1, interval('30s'),      0),
-        'max-interval'        => setv(T_DELAY, 0, 0, 1, interval('25d'),      0),
-        'min-error-interval'  => setv(T_DELAY, 0, 0, 1, interval('5m'),       0),
-        'warned-min-interval'       => setv(T_ANY, 0, 1, 0, 0,                undef),
-        'warned-min-error-interval' => setv(T_ANY, 0, 1, 0, 0,                undef),
+        'server'              => setv(T_FQDNP, 1, 0, 'dyn.woima.fi',       undef),
+        'login'               => setv(T_LOGIN, 1, 0, '',                   undef),
+        'password'            => setv(T_PASSWD,1, 0, '',                   undef),
+        'ip'                  => setv(T_IP,    0, 1, undef,                undef),
+        'wtime'               => setv(T_DELAY, 0, 1, 0,                    interval('30s')),
+        'mtime'               => setv(T_NUMBER,0, 1, 0,                    undef),
+        'atime'               => setv(T_NUMBER,0, 1, 0,                    undef),
+        'status'              => setv(T_ANY,   0, 1, '',                   undef),
+        'min-interval'        => setv(T_DELAY, 0, 0, interval('30s'),      0),
+        'max-interval'        => setv(T_DELAY, 0, 0, interval('25d'),      0),
+        'min-error-interval'  => setv(T_DELAY, 0, 0, interval('5m'),       0),
+        'warned-min-interval'       => setv(T_ANY, 0, 1, 0,                undef),
+        'warned-min-error-interval' => setv(T_ANY, 0, 1, 0,                undef),
     },
     'yandex-common-defaults' => {
-        'server'              => setv(T_FQDNP, 1, 0, 1, 'pddimp.yandex.ru',   undef),
+        'server'              => setv(T_FQDNP, 1, 0, 'pddimp.yandex.ru',   undef),
     },
     'dnsmadeeasy-common-defaults' => {
-        'server'              => setv(T_FQDNP, 1, 0, 1, 'cp.dnsmadeeasy.com', undef),
-        'script'              => setv(T_STRING,1, 1, 1, '/servlet/updateip',  undef),
+        'server'              => setv(T_FQDNP, 1, 0, 'cp.dnsmadeeasy.com', undef),
+        'script'              => setv(T_STRING,1, 1, '/servlet/updateip',  undef),
     },
     'dondominio-common-defaults' => {
-        'server'              => setv(T_FQDNP, 1, 0, 1, 'dondns.dondominio.com', undef),
+        'server'              => setv(T_FQDNP, 1, 0, 'dondns.dondominio.com', undef),
     },
     'ovh-common-defaults' => {
-        'server'              => setv(T_FQDNP, 1, 0, 1, 'www.ovh.com',        undef),
-        'script'              => setv(T_STRING,1, 1, 1, '/nic/update',        undef),
-        'login'               => setv(T_LOGIN, 1, 0, 1, '',                   undef),
-        'password'            => setv(T_PASSWD,1, 0, 1, '',                   undef),
+        'server'              => setv(T_FQDNP, 1, 0, 'www.ovh.com',        undef),
+        'script'              => setv(T_STRING,1, 1, '/nic/update',        undef),
+        'login'               => setv(T_LOGIN, 1, 0, '',                   undef),
+        'password'            => setv(T_PASSWD,1, 0, '',                   undef),
     },
 );
 my %services = (
-    'dyndns1' => {
-        'updateable' => \&nic_dyndns2_updateable,
-        'update'     => \&nic_dyndns1_update,
-        'examples'   => \&nic_dyndns1_examples,
-        'variables'  => merge(
-            $variables{'dyndns-common-defaults'},
-            $variables{'service-common-defaults'},
-        ),
-    },
-    'dyndns2' => {
-        'updateable' => \&nic_dyndns2_updateable,
-        'update'     => \&nic_dyndns2_update,
-        'examples'   => \&nic_dyndns2_examples,
-        'variables'  => merge(
-            { 'custom'  => setv(T_BOOL,   0, 1, 1, 0,             undef), },
-            { 'script'  => setv(T_STRING, 1, 1, 1, '/nic/update', undef), },
-            $variables{'dyndns-common-defaults'},
-            $variables{'service-common-defaults'},
-        ),
-    },
-    'noip' => {
-        'updateable' => undef,
-        'update'     => \&nic_noip_update,
-        'examples'   => \&nic_noip_examples,
-        'variables'  => merge(
-            { 'custom' => setv(T_BOOL, 0, 1, 1, 0, undef), },
-            $variables{'noip-common-defaults'},
-            $variables{'noip-service-common-defaults'},
-        ),
-    },
-    'dslreports1' => {
-        'updateable' => undef,
-        'update'     => \&nic_dslreports1_update,
-        'examples'   => \&nic_dslreports1_examples,
-        'variables'  => merge(
-            { 'host' => setv(T_NUMBER, 1, 1, 1, 0, undef) },
-            $variables{'service-common-defaults'},
-        ),
-    },
-    'hammernode1' => {
-        'updateable' => undef,
-        'update'     => \&nic_hammernode1_update,
-        'examples'   => \&nic_hammernode1_examples,
-        'variables'  => merge(
-            { 'server'       => setv(T_FQDNP, 1, 0, 1, 'dup.hn.org',   undef) },
-            { 'min-interval' => setv(T_DELAY, 0, 0, 1, interval('5m'), 0), },
-            $variables{'service-common-defaults'},
-        ),
-    },
-    'zoneedit1' => {
-        'updateable' => undef,
-        'update'     => \&nic_zoneedit1_update,
-        'examples'   => \&nic_zoneedit1_examples,
-        'variables'  => merge(
-            { 'server'       => setv(T_FQDNP, 1, 0, 1, 'dynamic.zoneedit.com', undef) },
-            { 'min-interval' => setv(T_DELAY, 0, 0, 1, interval('5m'),         0), },
-            $variables{'service-common-defaults'},
-            $variables{'zoneedit-service-common-defaults'},
-        ),
-    },
-    'easydns' => {
-        'updateable' => undef,
-        'update'     => \&nic_easydns_update,
-        'examples'   => \&nic_easydns_examples,
-        'variables'  => merge(
-            { 'server'       => setv(T_FQDNP, 1, 0, 1, 'members.easydns.com', undef) },
-            { 'min-interval' => setv(T_DELAY, 0, 0, 1, interval('5m'),        0), },
-            $variables{'easydns-common-defaults'},
-            $variables{'service-common-defaults'},
-        ),
-    },
-    'namecheap' => {
-        'updateable' => undef,
-        'update'     => \&nic_namecheap_update,
-        'examples'   => \&nic_namecheap_examples,
-        'variables'  => merge(
-            { 'server'       => setv(T_FQDNP, 1, 0, 1, 'dynamicdns.park-your-domain.com', undef) },
-            { 'min-interval' => setv(T_DELAY, 0, 0, 1, 0,                                 interval('5m')), },
-            $variables{'service-common-defaults'},
-        ),
-    },
-    'nfsn' => {
-        'updateable' => undef,
-        'update'     => \&nic_nfsn_update,
-        'examples'   => \&nic_nfsn_examples,
-        'variables'  => merge(
-            { 'server'       => setv(T_FQDNP,  1, 0, 1, 'api.nearlyfreespeech.net', undef) },
-            { 'min_interval' => setv(T_FQDNP,  0, 0, 1, 0,                          interval('5m')) },
-            { 'ttl'          => setv(T_NUMBER, 1, 0, 1, 300,                        undef) },
-            { 'zone'         => setv(T_FQDN,   1, 0, 1, undef,                      undef) },
-            $variables{'service-common-defaults'},
-        ),
-    },
-    'sitelutions' => {
-        'updateable' => undef,
-        'update'     => \&nic_sitelutions_update,
-        'examples'   => \&nic_sitelutions_examples,
-        'variables'  => merge(
-            { 'server'       => setv(T_FQDNP, 1, 0, 1, 'www.sitelutions.com', undef) },
-            { 'min-interval' => setv(T_DELAY, 0, 0, 1, 0,                     interval('5m')), },
-            $variables{'service-common-defaults'},
-        ),
-    },
-    'freedns' => {
-        'updateable' => undef,
-        'update'     => \&nic_freedns_update,
-        'examples'   => \&nic_freedns_examples,
-        'variables'  => merge(
-            { 'server'       => setv(T_FQDNP, 1, 0, 1, 'freedns.afraid.org', undef) },
-            { 'min-interval' => setv(T_DELAY, 0, 0, 1, 0,                    interval('5m')), },
-            $variables{'service-common-defaults'},
-        ),
-    },
     'changeip' => {
         'updateable' => undef,
         'update'     => \&nic_changeip_update,
         'examples'   => \&nic_changeip_examples,
         'variables'  => merge(
-            { 'server'       => setv(T_FQDNP, 1, 0, 1, 'nic.changeip.com', undef) },
-            { 'min-interval' => setv(T_DELAY, 0, 0, 1, 0,                  interval('5m')), },
-            $variables{'service-common-defaults'},
-        ),
-    },
-    'dtdns' => {
-        'updateable' => undef,
-        'update'     => \&nic_dtdns_update,
-        'examples'   => \&nic_dtdns_examples,
-        'variables'  => merge(
-            $variables{'dtdns-common-defaults'},
-            $variables{'service-common-defaults'},
-        ),
-    },
-    'nsupdate' => {
-        'updateable' => undef,
-        'update'     => \&nic_nsupdate_update,
-        'examples'   => \&nic_nsupdate_examples,
-        'variables'  => merge(
-            { 'login' => setv(T_LOGIN, 1, 0, 1, '/usr/bin/nsupdate', undef), },
-            $variables{'nsupdate-common-defaults'},
+            { 'server'       => setv(T_FQDNP, 1, 0, 'nic.changeip.com', undef) },
+            { 'min-interval' => setv(T_DELAY, 0, 0, 0,                  interval('5m')), },
             $variables{'service-common-defaults'},
         ),
     },
@@ -724,68 +613,25 @@ my %services = (
         'update'     => \&nic_cloudflare_update,
         'examples'   => \&nic_cloudflare_examples,
         'variables'  => merge(
-            { 'server'       => setv(T_FQDNP, 1, 0, 1, 'api.cloudflare.com/client/v4', undef) },
-            { 'min-interval' => setv(T_DELAY, 0, 0, 1, interval('5m'), 0), },
+            { 'server'       => setv(T_FQDNP, 1, 0, 'api.cloudflare.com/client/v4', undef) },
+            { 'min-interval' => setv(T_DELAY, 0, 0, interval('5m'), 0), },
             $variables{'cloudflare-common-defaults'},
             $variables{'service-common-defaults'},
         ),
     },
-    'googledomains' => {
+    'cloudns' => {
         'updateable' => undef,
-        'update'     => \&nic_googledomains_update,
-        'examples'   => \&nic_googledomains_examples,
-        'variables'  => merge(
-            { 'min-interval' => setv(T_DELAY, 0, 0, 1, interval('5m'), 0), },
-            $variables{'googledomains-common-defaults'},
-            $variables{'service-common-defaults'},
-        ),
-    },
-    'duckdns' => {
-        'updateable' => undef,
-        'update'     => \&nic_duckdns_update,
-        'examples'   => \&nic_duckdns_examples,
-        'variables'  => merge(
-            $variables{'duckdns-common-defaults'},
-            $variables{'service-common-defaults'},
-        ),
-    },
-    'he' => {
-        'updateable' => undef,
-        'update'     => \&nic_he_update,
-        'examples'   => \&nic_he_examples,
-        'variables'  => merge(
-            {'min-interval' => setv(T_DELAY, 0, 0, 1, interval('5m'), 0),},
-            $variables{'he-common-defaults'},
-            $variables{'service-common-defaults'},
-        ),
-    },
-    'freemyip' => {
-        'updateable' => undef,
-        'update'     => \&nic_freemyip_update,
-        'examples'   => \&nic_freemyip_examples,
-        'variables'  => merge(
-            $variables{'freemyip-common-defaults'},
-            $variables{'service-common-defaults'},
-        ),
-    },
-    'woima' => {
-        'updateable' => undef,
-        'update'     => \&nic_woima_update,
-        'examples'   => \&nic_woima_examples,
-        'variables'  => merge(
-            $variables{'woima-common-defaults'},
-            $variables{'woima-service-common-defaults'},
-        ),
-    },
-    'yandex' => {
-        'updateable' => undef,
-        'update'     => \&nic_yandex_update,
-        'examples'   => \&nic_yandex_examples,
-        'variables'  => merge(
-            { 'min-interval' => setv(T_DELAY, 0, 0, 1, interval('5m'), 0), },
-            $variables{'yandex-common-defaults'},
-            $variables{'service-common-defaults'},
-        ),
+        'update' => \&nic_cloudns_update,
+        'examples' => \&nic_cloudns_examples,
+        'variables' => {
+            %{$variables{'service-common-defaults'}},
+            'dynurl' => setv(T_STRING, 1, 0, undef, undef),
+            # nic_updateable() assumes that every service uses a username and password but that is
+            # not true for CloudNS. Silence warnings by redefining the username and password
+            # variables as non-required with a non-empty default.
+            'login'    => setv(T_STRING, 0, 0, 'unused', undef),
+            'password' => setv(T_STRING, 0, 0, 'unused', undef),
+        },
     },
     'dnsmadeeasy' => {
         'updateable' => undef,
@@ -805,6 +651,155 @@ my %services = (
             $variables{'service-common-defaults'},
         ),
     },
+    'dslreports1' => {
+        'updateable' => undef,
+        'update'     => \&nic_dslreports1_update,
+        'examples'   => \&nic_dslreports1_examples,
+        'variables'  => merge(
+            { 'host' => setv(T_NUMBER, 1, 1, 0, undef) },
+            $variables{'service-common-defaults'},
+        ),
+    },
+    'dtdns' => {
+        'updateable' => undef,
+        'update'     => \&nic_dtdns_update,
+        'examples'   => \&nic_dtdns_examples,
+        'variables'  => merge(
+            $variables{'dtdns-common-defaults'},
+            $variables{'service-common-defaults'},
+        ),
+    },
+    'duckdns' => {
+        'updateable' => undef,
+        'update'     => \&nic_duckdns_update,
+        'examples'   => \&nic_duckdns_examples,
+        'variables'  => merge(
+            $variables{'duckdns-common-defaults'},
+            $variables{'service-common-defaults'},
+        ),
+    },
+    'dyndns1' => {
+        'updateable' => \&nic_dyndns2_updateable,
+        'update'     => \&nic_dyndns1_update,
+        'examples'   => \&nic_dyndns1_examples,
+        'variables'  => merge(
+            $variables{'dyndns-common-defaults'},
+            $variables{'service-common-defaults'},
+        ),
+    },
+    'dyndns2' => {
+        'updateable' => \&nic_dyndns2_updateable,
+        'update'     => \&nic_dyndns2_update,
+        'examples'   => \&nic_dyndns2_examples,
+        'variables'  => merge(
+            { 'custom'  => setv(T_BOOL,   0, 1, 0,             undef), },
+            { 'script'  => setv(T_STRING, 1, 1, '/nic/update', undef), },
+            $variables{'dyndns-common-defaults'},
+            $variables{'service-common-defaults'},
+        ),
+    },
+    'easydns' => {
+        'updateable' => undef,
+        'update'     => \&nic_easydns_update,
+        'examples'   => \&nic_easydns_examples,
+        'variables'  => merge(
+            { 'server'       => setv(T_FQDNP, 1, 0, 'members.easydns.com', undef) },
+            { 'min-interval' => setv(T_DELAY, 0, 0, interval('5m'),        0), },
+            $variables{'easydns-common-defaults'},
+            $variables{'service-common-defaults'},
+        ),
+    },
+    'freedns' => {
+        'updateable' => undef,
+        'update'     => \&nic_freedns_update,
+        'examples'   => \&nic_freedns_examples,
+        'variables'  => merge(
+            { 'server'       => setv(T_FQDNP, 1, 0, 'freedns.afraid.org', undef) },
+            { 'min-interval' => setv(T_DELAY, 0, 0, 0,                    interval('5m')), },
+            $variables{'service-common-defaults'},
+        ),
+    },
+    'freemyip' => {
+        'updateable' => undef,
+        'update'     => \&nic_freemyip_update,
+        'examples'   => \&nic_freemyip_examples,
+        'variables'  => merge(
+            $variables{'freemyip-common-defaults'},
+            $variables{'service-common-defaults'},
+        ),
+    },
+    'googledomains' => {
+        'updateable' => undef,
+        'update'     => \&nic_googledomains_update,
+        'examples'   => \&nic_googledomains_examples,
+        'variables'  => merge(
+            { 'min-interval' => setv(T_DELAY, 0, 0, interval('5m'), 0), },
+            $variables{'googledomains-common-defaults'},
+            $variables{'service-common-defaults'},
+        ),
+    },
+    'hammernode1' => {
+        'updateable' => undef,
+        'update'     => \&nic_hammernode1_update,
+        'examples'   => \&nic_hammernode1_examples,
+        'variables'  => merge(
+            { 'server'       => setv(T_FQDNP, 1, 0, 'dup.hn.org',   undef) },
+            { 'min-interval' => setv(T_DELAY, 0, 0, interval('5m'), 0), },
+            $variables{'service-common-defaults'},
+        ),
+    },
+    'he' => {
+        'updateable' => undef,
+        'update'     => \&nic_he_update,
+        'examples'   => \&nic_he_examples,
+        'variables'  => merge(
+            {'min-interval' => setv(T_DELAY, 0, 0, 1, interval('5m'), 0),},
+            $variables{'he-common-defaults'},
+            $variables{'service-common-defaults'},
+        ),
+    },
+    'namecheap' => {
+        'updateable' => undef,
+        'update'     => \&nic_namecheap_update,
+        'examples'   => \&nic_namecheap_examples,
+        'variables'  => merge(
+            { 'server'       => setv(T_FQDNP, 1, 0, 'dynamicdns.park-your-domain.com', undef) },
+            { 'min-interval' => setv(T_DELAY, 0, 0, 0,                                 interval('5m')), },
+            $variables{'service-common-defaults'},
+        ),
+    },
+    'nfsn' => {
+        'updateable' => undef,
+        'update'     => \&nic_nfsn_update,
+        'examples'   => \&nic_nfsn_examples,
+        'variables'  => merge(
+            { 'server'       => setv(T_FQDNP,  1, 0, 'api.nearlyfreespeech.net', undef) },
+            { 'min_interval' => setv(T_FQDNP,  0, 0, 0,                          interval('5m')) },
+            { 'ttl'          => setv(T_NUMBER, 1, 0, 300,                        undef) },
+            { 'zone'         => setv(T_FQDN,   1, 0, undef,                      undef) },
+            $variables{'service-common-defaults'},
+        ),
+    },
+    'noip' => {
+        'updateable' => undef,
+        'update'     => \&nic_noip_update,
+        'examples'   => \&nic_noip_examples,
+        'variables'  => merge(
+            { 'custom' => setv(T_BOOL, 0, 1, 0, undef), },
+            $variables{'noip-common-defaults'},
+            $variables{'noip-service-common-defaults'},
+        ),
+    },
+    'nsupdate' => {
+        'updateable' => undef,
+        'update'     => \&nic_nsupdate_update,
+        'examples'   => \&nic_nsupdate_examples,
+        'variables'  => merge(
+            { 'login' => setv(T_LOGIN, 1, 0, '/usr/bin/nsupdate', undef), },
+            $variables{'nsupdate-common-defaults'},
+            $variables{'service-common-defaults'},
+        ),
+    },
     'ovh' => {
         'updateable' => undef,
         'update'     => \&nic_ovh_update,
@@ -812,6 +807,46 @@ my %services = (
         'variables'  => merge(
             $variables{'ovh-common-defaults'},
             $variables{'service-common-defaults'},
+        ),
+    },
+    'sitelutions' => {
+        'updateable' => undef,
+        'update'     => \&nic_sitelutions_update,
+        'examples'   => \&nic_sitelutions_examples,
+        'variables'  => merge(
+            { 'server'       => setv(T_FQDNP, 1, 0, 'www.sitelutions.com', undef) },
+            { 'min-interval' => setv(T_DELAY, 0, 0, 0,                     interval('5m')), },
+            $variables{'service-common-defaults'},
+        ),
+    },
+    'woima' => {
+        'updateable' => undef,
+        'update'     => \&nic_woima_update,
+        'examples'   => \&nic_woima_examples,
+        'variables'  => merge(
+            $variables{'woima-common-defaults'},
+            $variables{'woima-service-common-defaults'},
+        ),
+    },
+    'yandex' => {
+        'updateable' => undef,
+        'update'     => \&nic_yandex_update,
+        'examples'   => \&nic_yandex_examples,
+        'variables'  => merge(
+            { 'min-interval' => setv(T_DELAY, 0, 0, interval('5m'), 0), },
+            $variables{'yandex-common-defaults'},
+            $variables{'service-common-defaults'},
+        ),
+    },
+    'zoneedit1' => {
+        'updateable' => undef,
+        'update'     => \&nic_zoneedit1_update,
+        'examples'   => \&nic_zoneedit1_examples,
+        'variables'  => merge(
+            { 'server'       => setv(T_FQDNP, 1, 0, 'dynamic.zoneedit.com', undef) },
+            { 'min-interval' => setv(T_DELAY, 0, 0, interval('5m'),         0), },
+            $variables{'service-common-defaults'},
+            $variables{'zoneedit-service-common-defaults'},
         ),
     },
 );
@@ -910,111 +945,111 @@ my @opt = (
     "  project now maintained on https://github.com/ddclient/ddclient"
 );
 
-## process args
-my $opt_usage = process_args(@opt);
-my ($result, %config, %globals, %cache);
-my $saved_cache = '';
-my %saved_opt   = %opt;
-$result = 'OK';
-my (%warned_ipv4, %warned_ipv6);
-my $inv_ip_warn_count = opt('max-warn') // 1;
+sub main {
+    ## process args
+    my $opt_usage = process_args(@opt);
+    $saved_cache = '';
+    %saved_opt = %opt;
+    $result = 'OK';
+    my (%warned_ipv4, %warned_ipv6);
+    my $inv_ip_warn_count = opt('max-warn') // 1;
 
-test_geturl(opt('geturl')) if opt('geturl');
+    test_geturl(opt('geturl')) if opt('geturl');
 
-if (opt('help')) {
-    printf "%s\n", $opt_usage;
-    exit 0;
-}
-
-## read config file because 'daemon' mode may be defined there.
-read_config($opt{'file'} // default('file'), \%config, \%globals);
-init_config();
-test_possible_ip() if opt('query');
-
-my $caught_hup  = 0;
-my $caught_term = 0;
-my $caught_int  = 0;
-$SIG{'HUP'}  = sub { $caught_hup  = 1; };
-$SIG{'TERM'} = sub { $caught_term = 1; };
-$SIG{'INT'}  = sub { $caught_int  = 1; };
-# don't fork() if foreground
-if (opt('foreground')) {
-    ;
-} elsif (opt('daemon')) {
-    $SIG{'CHLD'} = 'IGNORE';
-    my $pid = fork;
-    if ($pid < 0) {
-        print STDERR "${program}: can not fork ($!)\n";
-        exit -1;
-    } elsif ($pid) {
+    if (opt('help')) {
+        printf "%s\n", $opt_usage;
         exit 0;
     }
-    $SIG{'CHLD'} = 'DEFAULT';
-    open(STDOUT, ">/dev/null");
-    open(STDERR, ">/dev/null");
-    open(STDIN,  "</dev/null");
-    write_pid();
-}
 
-umask 077;
-my $daemon;
-do {
-    $now    = time;
-    $result = 'OK';
-    %opt    = %saved_opt;
-    if (opt('help')) {
-        *STDERR = *STDOUT;
-        printf("Help found");
-    }
-
+    ## read config file because 'daemon' mode may be defined there.
     read_config($opt{'file'} // default('file'), \%config, \%globals);
     init_config();
-    read_cache(opt('cache'), \%cache);
-    print_info() if opt('debug') && opt('verbose');
+    test_possible_ip() if opt('query');
 
-    fatal("invalid argument '-use %s'; possible values are:\n%s", $opt{'use'}, join("\n", ip_strategies_usage()))
-        unless exists $ip_strategies{lc opt('use')};
-    if (defined($opt{'usev6'})) {
-        usage("invalid argument '-usev6 %s'; possible values are:\n%s", $opt{'usev6'}, join("\n",ipv6_strategies_usage()))
-            unless exists $ipv6_strategies{lc opt('usev6')};
-    }
-
-    $daemon = opt('daemon');
-
-    update_nics();
-
-    if ($daemon) {
-        debug("sleep %s", $daemon);
-        sendmail();
-
-        my $left = $daemon;
-        while (($left > 0) && !$caught_hup && !$caught_term && !$caught_int) {
-            my $delay = $left > 10 ? 10 : $left;
-
-            $0 = sprintf("%s - sleeping for %s seconds", $program, $left);
-            $left -= sleep $delay;
-            # preventing deep sleep - see [bugs:#46]
-            if ($left > $daemon) {
-                $left = $daemon;
-            }
+    my $caught_hup  = 0;
+    my $caught_term = 0;
+    my $caught_int  = 0;
+    $SIG{'HUP'}  = sub { $caught_hup  = 1; };
+    $SIG{'TERM'} = sub { $caught_term = 1; };
+    $SIG{'INT'}  = sub { $caught_int  = 1; };
+    # don't fork() if foreground
+    if (opt('foreground')) {
+        ;
+    } elsif (opt('daemon')) {
+        $SIG{'CHLD'} = 'IGNORE';
+        my $pid = fork;
+        if ($pid < 0) {
+            print STDERR "${program}: can not fork ($!)\n";
+            exit -1;
+        } elsif ($pid) {
+            exit 0;
         }
-        $caught_hup = 0;
-        $result     = 0;
-
-    } elsif (!scalar(%config)) {
-        warning("no hosts to update.") unless !opt('quiet') || opt('verbose') || !$daemon;
-        $result = 1;
-
-    } else {
-        $result = $result eq 'OK' ? 0 : 1;
+        $SIG{'CHLD'} = 'DEFAULT';
+        open(STDOUT, ">/dev/null");
+        open(STDERR, ">/dev/null");
+        open(STDIN,  "</dev/null");
+        write_pid();
     }
-} while ($daemon && !$result && !$caught_term && !$caught_int);
 
-warning("caught SIGINT; exiting") if $caught_int;
-unlink_pid();
-sendmail();
+    umask 077;
+    do {
+        $now    = time;
+        $result = 'OK';
+        %opt    = %saved_opt;
+        if (opt('help')) {
+            *STDERR = *STDOUT;
+            printf("Help found");
+        }
 
-exit($result);
+        read_config($opt{'file'} // default('file'), \%config, \%globals);
+        init_config();
+        read_cache(opt('cache'), \%cache);
+        print_info() if opt('debug') && opt('verbose');
+
+        fatal("invalid argument '-use %s'; possible values are:\n%s", $opt{'use'}, join("\n", ip_strategies_usage()))
+            unless exists $ip_strategies{lc opt('use')};
+        if (defined($opt{'usev6'})) {
+            usage("invalid argument '-usev6 %s'; possible values are:\n%s", $opt{'usev6'}, join("\n",ipv6_strategies_usage()))
+                unless exists $ipv6_strategies{lc opt('usev6')};
+        }
+
+        $daemon = opt('daemon');
+
+        update_nics();
+
+        if ($daemon) {
+            debug("sleep %s", $daemon);
+            sendmail();
+
+            my $left = $daemon;
+            while (($left > 0) && !$caught_hup && !$caught_term && !$caught_int) {
+                my $delay = $left > 10 ? 10 : $left;
+
+                $0 = sprintf("%s - sleeping for %s seconds", $program, $left);
+                $left -= sleep $delay;
+                # preventing deep sleep - see [bugs:#46]
+                if ($left > $daemon) {
+                    $left = $daemon;
+                }
+            }
+            $caught_hup = 0;
+            $result     = 0;
+
+        } elsif (!scalar(%config)) {
+            warning("no hosts to update.") unless !opt('quiet') || opt('verbose') || !$daemon;
+            $result = 1;
+
+        } else {
+            $result = $result eq 'OK' ? 0 : 1;
+        }
+    } while ($daemon && !$result && !$caught_term && !$caught_int);
+
+    warning("caught SIGINT; exiting") if $caught_int;
+    unlink_pid();
+    sendmail();
+
+    exit($result);
+}
 
 ######################################################################
 ## runpostscript
@@ -2430,9 +2465,9 @@ USE_CURL
         my $filename = "$server/$url";
         $filename =~ s|/|%2F|g;
         if (opt('exec')) {
-            $reply = save_file("${savedir}$filename", $reply, 'unique');
+            $reply = save_file("$savedir/$filename", $reply, 'unique');
         } else {
-            $reply = load_file("${savedir}$filename");
+            $reply = load_file("$savedir/$filename");
         }
     }
 
@@ -2871,13 +2906,11 @@ sub extract_ipv6_gua {
 ######################################################################
 sub group_hosts_by {
     my ($hosts, $attributes) = @_;
-
+    my %attrs = (map({ ($_ => 1) } @$attributes), 'wantip' => 1);
+    my @attrs = sort(keys(%attrs));
     my %groups = ();
     foreach my $h (@$hosts) {
-        my @keys = (@$attributes, 'wantip');
-        map { $config{$h}{$_} = '' unless exists $config{$h}{$_} } @keys;
-        my $sig = join(',', map { "$_=$config{$h}{$_}" } @keys);
-
+        my $sig = join(',', map({ sprintf("%s=%s", $_, $config{$h}{$_} // '') } @attrs));
         push @{$groups{$sig}}, $h;
     }
     return %groups;
@@ -4474,136 +4507,106 @@ EoEXAMPLE
 ######################################################################
 ## nic_freedns_update
 ##
-## written by John Haney
+## API v1 documented at http://freedns.afraid.org/api/
 ##
-## based on http://freedns.afraid.org/api/
-## needs this url to update:
-## http://freedns.afraid.org/api/?action=getdyndns&sha=<sha1sum of login|password>
-## This returns a list of host|currentIP|updateURL lines.
-## Pick the line that matches myhost, and fetch the URL.
-## word 'Updated' for success, 'fail' for failure.
+## An update requires two steps. The first is to get a list of records from:
+##   http://freedns.afraid.org/api/?action=getdyndns&v=2&sha=<sha1sum of login|password>
+## The returned list looks like:
 ##
+##   hostname1.example.com|1.2.3.4|http://example/update/url1
+##   hostname1.example.com|dead::beef|http://example/update/url2
+##   hostname2.example.com|5.6.7.8|http://example/update/url3
+##   hostname2.example.com|9.10.11.12|http://example/update/url4
+##   hostname3.example.com|cafe::f00d|http://example/update/url5
+##
+## The record's columns are separated by '|'. The first is the hostname, the second is the current
+## address, and the third is the record-specific update URL. There can be multiple records for the
+## same host, and they can even have the same address type. Any record can be updated to hold
+## either type of address (e.g., if given an IPv6 address the record will automatically become an
+## AAAA record).
+##
+## The second step is to visit the appropriate record's update URL with
+## ?address=<ipv4-or-ipv6-address> appended. "Updated" in the result means success, "fail" means
+## failure.
 ######################################################################
 sub nic_freedns_update {
-
-
     debug("\nnic_freedns_update -------------------");
-
-    ## First get the list of updatable hosts
-    my $url;
-    # note, use '&v=2' in $url in order to pull IPv6 AAAA records as well as IPv4 A records
-    $url = "http://$config{$_[0]}{'server'}/api/?action=getdyndns&v=2&sha="
-      . &sha1_hex("$config{$_[0]}{'login'}|$config{$_[0]}{'password'}");
+    # Separate the records that are currently holding IPv4 addresses from the records that are
+    # currently holding IPv6 addresses so that we can avoid switching a record to a different
+    # address type.
+    my %recs_ipv4;
+    my %recs_ipv6;
+    my $url_tmpl = "http://$config{$_[0]}{'server'}/api/?action=getdyndns&v=2&sha=<credentials>";
+    my $creds = sha1_hex("$config{$_[0]}{'login'}|$config{$_[0]}{'password'}");
+    (my $url = $url_tmpl) =~ s/<credentials>/$creds/;
     my $reply = geturl({ proxy => opt('proxy'), url => $url });
-    if (!defined($reply) || !$reply || !header_ok($_[0], $reply)) {
-        failed("updating %s: Could not connect to %s for site list.", $_[0], $url);
-        return;
-    }
-    my @lines = split("\n", $reply);
-    my %freedns_hosts;
-    my %freedns_hosts_ipv6;
-
-    # We have retrieved list of URLs associated with users FreeDNS account.
-    # Store them into freedns_hosts separating IPv4 (A records) from IPv6 (AAAA records)
-    grep {
-        my @rec = split(/\|/, $_);
-        if ($#rec > 0) {
-            # This little gem from http://home.deds.nl/~aeron/regex/
-            if ($rec[1] =~ /^(((?=.*(::))(?!.*\3.+\3))\3?|([\dA-F]{1,4}(\3|:\b|$)|\2))(?4){5}((?4){2}|(((2[0-4]|1\d|[1-9])?\d|25[0-5])\.?\b){4})\z/ai) {
-                debug("Host: %s, IPv6: %s", $rec[0], $rec[1]);
-                $freedns_hosts_ipv6{$rec[0]} = \@rec;
-            } else {
-                debug("Host: %s, IPv4: %s", $rec[0], $rec[1]);
-                $freedns_hosts{$rec[0]} = \@rec;
-            }
+    my $record_list_error = '';
+    if ($reply && header_ok($_[0], $reply)) {
+        $reply =~ s/^.*?\n\n//s;  # Strip the headers.
+        for (split("\n", $reply)) {
+            my @rec = split(/\|/);
+            next if ($#rec < 2);
+            my $recs = is_ipv6($rec[1]) ? \%recs_ipv6 : \%recs_ipv4;
+            $recs->{$rec[0]} = \@rec;
+            debug("host: %s, current address: %s, update URL: %s", @rec);
         }
-    } @lines;
-    if (!keys %freedns_hosts) {
-        failed("Could not get freedns update URLs from %s", $config{$_[0]}{'server'});
-        return;
+        if (keys(%recs_ipv4) + keys(%recs_ipv6) == 0) {
+            chomp($reply);
+            $record_list_error = "failed to get record list from $url_tmpl: $reply";
+        }
+    } else {
+        $record_list_error = "failed to get record list from $url_tmpl";
     }
-    ## update each configured host
+
     foreach my $h (@_) {
         if (!$h) { next }
         my $ip = delete $config{$h}{'wantip'};
-        my $ipv6 = delete $config{$h}{'wantipv6'};
 
-        info("%s: setting IP address(s) to %s / %s", $h, $ip // "<undefined>", $ipv6 // "<undefined>");
-        if (defined($freedns_hosts{$h}) && defined($ip)) {
-            if ($ip eq $freedns_hosts{$h}->[1]) {
+        info("%s: setting IP address to %s", $h, $ip);
+
+        if ($record_list_error ne '') {
+            $config{$h}{'status'} = 'failed';
+            failed("updating %s: %s", $h, $record_list_error);
+            next;
+        }
+        # If there is a record with matching type then update it, otherwise let
+        # freedns convert the record to the desired type.
+        my $rec = is_ipv6($ip)
+            ? ($recs_ipv6{$h} // $recs_ipv4{$h})
+            : ($recs_ipv4{$h} // $recs_ipv6{$h});
+        if (!defined($rec)) {
+            $config{$h}{'status'} = 'failed';
+            failed("updating %s: host record does not exist", $h);
+            next;
+        }
+
+        if ($ip eq $rec->[1]) {
+            $config{$h}{'ip'}     = $ip;
+            $config{$h}{'mtime'}  = $now;
+            $config{$h}{'status'} = 'good';
+            success("update not necessary %s: good: IP address already set to %s", $h, $ip)
+                if (!$daemon || opt('verbose'));
+        } else {
+            my $url = $rec->[2] . "&address=" . $ip;
+            debug("Update: %s", $url);
+            my $reply = geturl({proxy => opt('proxy'), url => $url });
+            if (!defined($reply) || !$reply || !header_ok($h, $reply)) {
+                $config{$h}{'status'} = 'failed';
+                failed("updating %s: Could not connect to %s.", $h, $url);
+                next;
+            }
+
+            $reply =~ s/^.*?\n\n//s;  # Strip the headers.
+            if ($reply =~ /Updated.*$h.*to.*$ip/) {
                 $config{$h}{'ip'}     = $ip;
                 $config{$h}{'mtime'}  = $now;
                 $config{$h}{'status'} = 'good';
-                success("update not necessary %s: good: IPv4 address already set to %s", $h, $ip) if (!$daemon || opt('verbose'));
+                success("updating %s: good: IP address set to %s", $h, $ip);
             } else {
-                debug("Update: %s", $freedns_hosts{$h}->[2]."&address=".$ip);
-                my $reply = geturl({proxy => opt('proxy'), url => $freedns_hosts{$h}->[2]."&address=".$ip});
-                if (!defined($reply) || !$reply) {
-                    failed("updating %s: Could not connect to %s.", $h, $freedns_hosts{$h}->[2]);
-                    last;
-                }
-                if (!header_ok($h, $reply)) {
-                    $config{$h}{'status'} = 'failed';
-                    last;
-                }
-
-                if ($reply =~ /Updated.*$h.*to.*$ip/) {
-                    $config{$h}{'ip'}     = $ip;
-                    $config{$h}{'mtime'}  = $now;
-                    $config{$h}{'status'} = 'good';
-                    success("updating %s: good: IP address set to %s", $h, $ip);
-                } else {
-                    $config{$h}{'status'} = 'failed';
-                    warning("SENT: %s", $freedns_hosts{$h}->[2]) unless opt('verbose');
-                    warning("REPLIED: %s", $reply);
-                    failed("updating %s: Invalid reply.", $h);
-                }
-            }
-        } else {
-            if (!$daemon || opt('verbose')) {
-                warning("%s: Cannot set IPv4 to %s No A record at FreeDNS", $h, $ip)
-                  if (!defined($freedns_hosts{$h}) && defined($ip));
-                warning("%s: Cannot set IPv4, A record exists but no address provided", $h)
-                  if (defined($freedns_hosts{$h}) && !defined($ip));
-            }
-        }
-
-        if (defined($freedns_hosts_ipv6{$h}) && defined($ipv6)) {
-            if($ipv6 eq $freedns_hosts_ipv6{$h}->[1]) {
-                $config{$h}{'ipv6'}     = $ipv6;
-                $config{$h}{'mtime'}  = $now;
-                $config{$h}{'status-ipv6'} = 'good';
-                success("update not necessary %s: good: IPv6 address already set to %s", $h, $ipv6) if (!$daemon || opt('verbose'));
-            } else {
-                debug("Update: %s", $freedns_hosts_ipv6{$h}->[2]."&address=".$ipv6);
-                my $reply = geturl({proxy => opt('proxy'), url => $freedns_hosts_ipv6{$h}->[2]."&address=".$ipv6});                
-                if (!defined($reply) || !$reply) {
-                    failed("updating %s: Could not connect to %s.", $h, $freedns_hosts_ipv6{$h}->[2]);
-                    last;
-                }
-                if(!header_ok($h, $reply)) {
-                    $config{$h}{'status'} = 'failed';
-                    last;
-                }
-
-                if($reply =~ /Updated.*$h.*to.*$ipv6/) {
-                    $config{$h}{'ipv6'}   = $ipv6;
-                    $config{$h}{'mtime'}  = $now;
-                    $config{$h}{'status-ipv6'} = 'good';
-                    success("updating %s: good: IPv6 address set to %s", $h, $ipv6);
-                } else {
-                    $config{$h}{'status-ipv6'} = 'failed';
-                    warning("SENT: %s", $freedns_hosts_ipv6{$h}->[2]) unless opt('verbose');
-                    warning("REPLIED: %s", $reply);
-                    failed("updating %s: Invalid reply.", $h);
-                }
-            }
-        } else {
-            if (!$daemon || opt('verbose')) {
-                warning("%s: Cannot set IPv6 to %s No AAAA record at FreeDNS", $h, $ipv6)
-                  if (!defined($freedns_hosts_ipv6{$h}) && defined($ipv6));
-                warning("%s: Cannot set IPv6, AAAA record exists but no address provided", $h)
-                  if (defined($freedns_hosts_ipv6{$h}) && !defined($ipv6));
+                $config{$h}{'status'} = 'failed';
+                warning("SENT: %s", $url) unless opt('verbose');
+                warning("REPLIED: %s", $reply);
+                failed("updating %s: Invalid reply.", $h);
             }
         }
     }
@@ -6104,6 +6107,75 @@ sub nic_ovh_update {
     }
 }
 
+sub nic_cloudns_examples {
+    return <<"EoEXAMPLE";
+o 'cloudns'
+
+The 'cloudns' protocol is used for ClouDNS (https://www.cloudns.net).  Details
+about dynamic DNS updates can be found at https://www.cloudns.net/dynamic-dns/.
+
+Available configuration variables:
+  * dynurl: The DynURL associated with the A or AAAA record you wish to update.
+
+Limitations:
+  * $program cannot tell if the DynURL you provide belongs to the hostname you
+    specify.
+  * ClouDNS does not document how to tell whether an update suceeded or failed,
+    so there is no way for $program to reliably handle failures.
+  * The ClouDNS API does not provide a reliable way to set the desired IP
+    address. It might save the IP address you want, or it might save the IP
+    address that connects to CloudDNS. It is more likely to work if you do not
+    use a proxy.
+
+Example ${program}.conf file entry:
+  protocol=cloudns,                                                        \\
+  dynurl=https://ipv4.cloudns.net/api/dynamicURL/?q=Njc1OTE2OjY3Njk0ND..., \\
+  myhost.example.com
+EoEXAMPLE
+}
+
+sub nic_cloudns_update {
+    my %groups = group_hosts_by([ @_ ], [ qw(dynurl) ]);
+    for my $hr (values(%groups)) {
+        my @hosts = @$hr;
+        my $hosts = join(',', @hosts);
+        my $ip = $config{$hosts[0]}{'wantip'};
+        my $dynurl = $config{$hosts[0]}{'dynurl'};
+        delete $config{$_}{'wantip'} for @hosts;
+        # https://www.cloudns.net/wiki/article/36/ says, "If you are behind a proxy and your real
+        # IP is set in the header X-Forwarded-For you need to add &proxy=1 at the end of the
+        # DynamicURL." We abuse this to pass the desired IP address to ClouDNS, which might not be
+        # the same as the client IP address seen by ClouDNS.
+        my $reply = geturl({
+            proxy => opt('proxy'),
+            url => $dynurl . '&proxy=1',
+            headers => "X-Forwarded-For: $ip\n",
+        });
+        if (($reply // '') eq '' || !header_ok($hosts, $reply)) {
+            $config{$_}{'status'} = 'failed' for @hosts;
+            failed("updating %s: failed to visit DynURL", $hosts);
+            next;
+        }
+        $reply =~ s/^.*?\n\n//s;  # Strip the headers.
+        chomp($reply);
+        if ($reply eq "The record's key is wrong!" || $reply eq "Invalid request.") {
+            $config{$_}{'status'} = 'failed' for @hosts;
+            failed("updating %s: %s", $hosts, $reply);
+            next;
+        }
+        # There's no documentation explaining possible return values, so we assume success.
+        $config{$_}{'ip'} = $ip for @hosts;
+        $config{$_}{'mtime'} = $now for @hosts;
+        $config{$_}{'status'} = 'good' for @hosts;
+        success("updating %s: IP address set to %s", $hosts, $ip);
+    }
+}
+
+# Execute main() if this file is run as a script or run via PAR (https://metacpan.org/pod/PAR),
+# otherwise do nothing. This "modulino" pattern makes it possible to import this file as a module
+# and test its functions directly; there's no need for test-only command-line arguments or stdout
+# parsing.
+__PACKAGE__->main() unless caller() && caller() ne 'PAR';
 
 ######################################################################
 # vim: ai et ts=4 sw=4 tw=78:
