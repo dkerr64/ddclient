@@ -2164,6 +2164,7 @@ sub check_value {
 
     } elsif ($type eq T_IPV6) {
         return undef if !is_ipv6($value);
+
     }
     return $value;
 }
@@ -2487,7 +2488,7 @@ sub get_ip {
     if ($use eq 'ip') {
         $ip  = opt('ip', $h);
         if (!is_ipv4($ip) && !is_ipv6($ip)) {
-            warning("'%s' is not a valid IPv4 or IPv6 address",$ip);
+            warning("'%s' is not a valid IPv4 or IPv6 address", $ip);
             $ip = undef;
         }
         $arg = 'ip';
@@ -2837,11 +2838,9 @@ sub is_ipv4 {
 ## extract_ipv4() extracts the first valid IPv4 address from given string.
 ## Accepts leading zeros in the address but removes them in returned value
 ######################################################################
-sub extract_ipv4{
-    if ((shift // '') !~ /\b((?:(?<octet>25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}
-                         (?&octet))\b/xa) {
-        return undef;
-    }
+sub extract_ipv4 {
+    (shift // '') =~ /\b((?:(?<octet>25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?&octet))\b/a
+        or return undef;
     (my $ip = $1) =~ s/\b0+\B//g; ## remove embedded leading zeros
     return $ip;
 }
