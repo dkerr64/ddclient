@@ -202,8 +202,8 @@ my @invalid_ipv6 = (
 
     # Invalid data
     "XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:1.2.3.4",
-    "1111:2222:3333:4444:5555:6666:00.00.00.00",
-    "1111:2222:3333:4444:5555:6666:000.000.000.000",
+#    "1111:2222:3333:4444:5555:6666:00.00.00.00",      actually valid
+#    "1111:2222:3333:4444:5555:6666:000.000.000.000",  actually valid
     "1111:2222:3333:4444:5555:6666:256.256.256.256",
 
     # To much components
@@ -493,7 +493,7 @@ foreach my $ip (@all_valid_ipv6) {
 # Run through valid mixed (IPv4 within IPv6 address).  We do not accept
 # this format so expect valid check to fail.
 foreach my $ip (@valid_mixed_ipv6) {
-    isnt(ddclient::is_ipv6($ip),1,"Testing valid mixed (as invalid) 'is_ipv6($ip)'");
+    is(ddclient::is_ipv6($ip),1,"Testing valid mixed 'is_ipv6($ip)'");
 }
 
 # Run through a bunch of invalid IPv6 addresses
