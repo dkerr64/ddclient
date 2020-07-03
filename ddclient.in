@@ -1030,6 +1030,7 @@ sub update_nics {
             next if $config{$h}{'protocol'} ne lc($s);
             $examined{$h} = 1;
             # we only do this once per 'use' and argument combination
+#TODO Add usev4 / ipv4 / etc.
             my $use       = opt('use',   $h);
             my $usev6     = opt('usev6', $h);
             my $arg_ip    = opt('ip',    $h) || '';
@@ -1077,6 +1078,7 @@ sub update_nics {
             }
             next if !nic_updateable($h, $updateable);
             push @hosts, $h;
+#TODO ipv4
             $ips{$ip} = $h if (defined($ip));
             $ipsv6{$ipv6} = $h if (defined($ipv6));
         }
@@ -1416,6 +1418,8 @@ sub init_config {
         $opt{'use'} = 'if'  if defined($opt{'if'});
         $opt{'use'} = 'ip'  if defined($opt{'ip'});
     }
+
+#TODO add usev4
 
     ## infer the IPv6 strategy if possible
     if (!defined($opt{'usev6'})) {
@@ -3081,6 +3085,7 @@ sub nic_updateable {
     my (%warned_ipv4, %warned_ipv6);
     my $inv_ip_warn_count = opt('max-warn') // 1;
 
+#TODO Above/below... add usev4 and 'disabled'
     if (defined($config{$host}{'use'}) && ($config{$host}{'use'} ne 'no') && ($ipv6 // 0) && ($warned_ipv6{$host} // 0)) {
         $warned_ipv6{$host} = 0;
         warning("IPv6 address for %s valid: %s. Reset warning count", $host, $ipv6);
@@ -3111,24 +3116,22 @@ sub nic_updateable {
         );
 
     } elsif ($cache{$host}{'mtime'} && interval_expired($host, 'mtime', 'max-interval')) {
-        warning(
-            "forcing update of %s from %s to %s; %s since last update on %s.",
-            $host, ($cache{$host}{'ip'} ? $cache{$host}{'ip'} : '<nothing>'),
-            $ip,
+        warning("forcing update of %s from %s to %s; %s since last update on %s.",
+                $host,
+                ($cache{$host}{'ip'} ? $cache{$host}{'ip'} : '<nothing>'), $ip,
                 prettyinterval($config{$host}{'max-interval'}),
                 prettytime($cache{$host}{'mtime'})
         );
         $update = 1;
 
+#TODO Add usev4
     } elsif ((defined($config{$host}{'use'}) && ($config{$host}{'use'} ne 'no'))
         && ((!exists($cache{$host}{'ip'})) || ("$cache{$host}{'ip'}" ne "$ip")))
     {
-        if (($cache{$host}{'status'} eq 'good')
-            && !interval_expired($host, 'mtime', 'min-interval'))
-        {
+        if (($cache{$host}{'status'} eq 'good') &&
+            !interval_expired($host, 'mtime', 'min-interval')) {
 
-            warning(
-                "skipping update of %s from %s to %s.\nlast updated %s.\nWait at least %s between update attempts.",
+            warning("skipping update of %s from %s to %s.\nlast updated %s.\nWait at least %s between update attempts.",
                     $host,
                     ($cache{$host}{'ip'}    ? $cache{$host}{'ip'}                : '<nothing>'),
                     $ip,
@@ -3145,8 +3148,7 @@ sub nic_updateable {
                 || (!($cache{$host}{'warned-min-error-interval'} // 0) && (($warned_ipv4{$host} // 0) < $inv_ip_warn_count))
               )
             {
-                warning(
-                    "skipping update of %s from %s to %s.\nlast updated %s but last attempt on %s failed.\nWait at least %s between update attempts.",
+                warning("skipping update of %s from %s to %s.\nlast updated %s but last attempt on %s failed.\nWait at least %s between update attempts.",
                     $host,
                     ($cache{$host}{'ip'}    ? $cache{$host}{'ip'}                : '<nothing>'),
                     $ip,
@@ -3210,28 +3212,20 @@ sub nic_updateable {
 
     } elsif (defined($sub) && &$sub($host)) {
         $update = 1;
-    } elsif (
-        (
-               defined($cache{$host}{'static'})
-            && defined($config{$host}{'static'})
-            && ($cache{$host}{'static'} ne $config{$host}{'static'})
-        )
-        || (   defined($cache{$host}{'wildcard'})
-            && defined($config{$host}{'wildcard'})
-            && ($cache{$host}{'wildcard'} ne $config{$host}{'wildcard'}))
-        || (   defined($cache{$host}{'mx'})
-            && defined($config{$host}{'mx'})
-            && ($cache{$host}{'mx'} ne $config{$host}{'mx'}))
-        || (   defined($cache{$host}{'backupmx'})
-            && defined($config{$host}{'backupmx'})
-            && ($cache{$host}{'backupmx'} ne $config{$host}{'backupmx'}))
-      )
-    {
+    } elsif ((defined($cache{$host}{'static'}) && defined($config{$host}{'static'}) &&
+              ($cache{$host}{'static'} ne $config{$host}{'static'})) ||
+             (defined($cache{$host}{'wildcard'}) && defined($config{$host}{'wildcard'}) &&
+              ($cache{$host}{'wildcard'} ne $config{$host}{'wildcard'})) ||
+             (defined($cache{$host}{'mx'}) && defined($config{$host}{'mx'}) &&
+              ($cache{$host}{'mx'} ne $config{$host}{'mx'})) ||
+             (defined($cache{$host}{'backupmx'}) && defined($config{$host}{'backupmx'}) &&
+              ($cache{$host}{'backupmx'} ne $config{$host}{'backupmx'}))) {
         info("updating %s because host settings have been changed.", $host);
         $update = 1;
 
     } else {
         if (opt('verbose')) {
+#TODO auu Usev4
             if (defined($config{$host}{'use'}) && ($config{$host}{'use'} ne 'no')) {
                 success("%s: skipped: IPv4 address was already set to %s.", $host, $ip);
             }
@@ -3240,6 +3234,7 @@ sub nic_updateable {
             }
         }
     }
+#TODO update to status-ipv4
     $config{$host}{'status'} = $cache{$host}{'status'} // '';
     $config{$host}{'status-ipv6'} = $cache{$host}{'status-ipv6'} // '';
     $config{$host}{'update'} = $update;
@@ -5200,7 +5195,6 @@ sub nic_cloudflare_update {
                 # Set domain
                 $url = "https://$config{$key}{'server'}/zones/$zone_id/dns_records/$dns_rec_id";
                 my $data = "{\"content\":\"$ip\"}";
-
                 $reply = geturl({
                     proxy => opt('proxy'),
                     url => $url,
