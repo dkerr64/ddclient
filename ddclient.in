@@ -2307,7 +2307,7 @@ sub is_ipv4 {
 ## removes embedded leading zeros, and returns the result.
 ######################################################################
 sub extract_ipv4 {
-    (shift // '') =~ /\b($regex_ipv4)\b/ or return undef;
+    (shift // '') =~ /(?:\b|_)($regex_ipv4)(?:\b|_)/ or return undef;
     (my $ip = $1) =~ s/\b0+\B//g; ## remove embedded leading zeros
     return $ip;
 }
