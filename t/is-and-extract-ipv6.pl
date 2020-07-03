@@ -106,7 +106,7 @@ my @valid_ipv6 = (
     "::2222:3333:4444:5555:6666:7777:8888",
 );
 
-my @valid_mixed_ipv6 = (
+my @valid_mixed_ipv6_non_gua = (
     # with thanks to http://home.deds.nl/~aeron/regex/valid_ipv6.txt
     "1111:2222:3333:4444:5555:6666:123.123.123.123",
     "1111:2222:3333:4444:5555::123.123.123.123",
@@ -130,6 +130,25 @@ my @valid_mixed_ipv6 = (
     "1111::3333:4444:5555:6666:123.123.123.123",
     "::3333:4444:5555:6666:123.123.123.123",
     "::2222:3333:4444:5555:6666:123.123.123.123",
+);
+
+my @valid_mixed_ipv6_gua = (
+    "2111:2222:3333:4444:5555:6666:123.123.123.123",
+    "2111:2222:3333:4444:5555::123.123.123.123",
+    "2111:2222:3333:4444::123.123.123.123",
+    "2111:2222:3333::123.123.123.123",
+    "2111:2222::123.123.123.123",
+    "2111::123.123.123.123",
+    "2111:2222:3333:4444::6666:123.123.123.123",
+    "2111:2222:3333::6666:123.123.123.123",
+    "2111:2222::6666:123.123.123.123",
+    "2111::6666:123.123.123.123",
+    "2111:2222:3333::5555:6666:123.123.123.123",
+    "2111:2222::5555:6666:123.123.123.123",
+    "2111::5555:6666:123.123.123.123",
+    "2111:2222::4444:5555:6666:123.123.123.123",
+    "2111::4444:5555:6666:123.123.123.123",
+    "2111::3333:4444:5555:6666:123.123.123.123",
 );
 
 my @invalid_ipv6 = (
@@ -424,7 +443,8 @@ my @all_valid_ipv6 = (
     @valid_ipv6_ula,
     @valid_ipv6_lla,
     @valid_ipv6,
-    @valid_mixed_ipv6,
+    @valid_mixed_ipv6_non_gua,
+    @valid_mixed_ipv6_gua
 );
 
 my @short_valid_ipv6 = (
@@ -611,6 +631,8 @@ foreach my $text (@if_samples) {
         is(ddclient::is_ipv6($ip),1,"Extracting '$ip' from '$line'")
     }
 }
+isnt(ddclient::is_ipv4(undef),1,"Testing is_ipv4 with undef");
+isnt(ddclient::extract_ipv4(undef),1,"Testing extract_ipv4 with undef");
 isnt(ddclient::is_ipv6(undef),1,"Testing is_ipv6 with undef");
 isnt(ddclient::extract_ipv6(undef),1,"Testing extract_ipv6 with undef");
 
