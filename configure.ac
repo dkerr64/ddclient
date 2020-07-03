@@ -11,7 +11,7 @@ AC_REQUIRE_AUX_FILE([tap-driver.sh])
 # tap-driver.sh, so build-aux/tap-driver.sh is checked in to keep the
 # above AC_REQUIRE_AUX_FILE line from causing configure to complain
 # about a mising file if the user has Automake 1.11.)
-AM_INIT_AUTOMAKE([1.11 -Wall -Werror foreign subdir-objects])
+AM_INIT_AUTOMAKE([1.11 -Wall -Werror foreign subdir-objects parallel-tests])
 AM_SILENT_RULES
 
 AC_PROG_MKDIR_P
@@ -21,9 +21,12 @@ AX_PROG_PERL_VERSION([5.10.1], [],
   [AC_MSG_ERROR([Perl 5.10.1 or newer not found])])
 AC_SUBST([PERL])
 
-# Perl modules required to run ddclient. Core modules may be omitted;
-# they are assumed to always exist.
+# Perl modules required to run ddclient. Note: CentOS, RHEL, and
+# Fedora put some core modules in separate packages, and the perl
+# package doesn't depend on all of them, so their availability can't
+# be assumed.
 m4_foreach_w([_m], [
+    version=0.77
   ], [AX_PROG_PERL_MODULES([_m], [],
          [AC_MSG_ERROR([missing required Perl module _m])])])
 
