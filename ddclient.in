@@ -2330,36 +2330,47 @@ sub extract_ipv6 {
     return $ip;
 }
 
+my $regex_ipv6_only_gua = qr/(?<![:.0-9A-Z]])   ## Negative lookbehind for word boundry
+     [23][A-F0-9]{3}:                           ## Starts with 2xxx: or 3xxx:
+     (?:[0-9A-F]{1,4}:){6}[0-9A-F]{1,4}         ##   in standard format
+    |(?=[23][A-F0-9]{3}:                        ## OR starts with 2xxx: or 3xxx:
+     (?:[0-9A-F]{0,4}:){0,6}[0-9A-F]{0,4}       ##   in compressed with at most 7 colons
+     (?![:.0-9A-Z]]))                           ##   and negative lookahead for boundry
+     (?:(?:[0-9A-F]{1,4}:){1,7}|:)(?:(?::[0-9A-F]{1,4}){1,7}|:)  ## and only 1 double-colon
+    |[23][A-F0-9]{3}:                           ## OR starts with 2xxx: or 3xxx:
+     (?:[0-9A-F]{1,4}:){6}:                     ##    compressed with 8 colons (double at end)
+    (?![:.0-9A-Z]])/xi;                         ## Negative lookahead for boundry
+
+my $regex_ipv4_prefix_gua = qr/(?<![:.0-9A-Z])  ## Negative lookbehind for word boundry
+     [23][A-F0-9]{3}:                           ## Starts with 2xxx: or 3xxx:
+     (?:[A-F0-9]{1,4}:){5}                      ##   in standard non-compressed format
+    |(?=[23][A-F0-9]{3}:                        ## OR starts with 2xxx: or 3xxx:
+     (?:[A-F0-9]{0,4}:){0,5}                    ##   in compressed with at most 5 colons
+     (?:[0-9]{1,3}\.){3}[0-9]{1,3}              ##   and 4 bytes
+     (?![:.0-9A-Z]))                            ##   and negative lookahead for boundry
+     (?:(?:[0-9A-F]{1,4}:){1,5}|:)(?:(?::[0-9A-F]{1,4}){1,5}:|:)  ## and only 1 double-colon
+    |[23][A-F0-9]{3}:                           ## OR starts with 2xxx: or 3xxx:
+     (?:[A-F0-9]{1,4}:){4}/xi;                  ##    compressed with 6 colons and 5 numbers
+
+
+my $regex_ipv6_gua = qr/
+     (?:$regex_ipv4_prefix_gua)(?:$regex_ipv4)  ## Is it a mixed IPv6:v4 GUA address
+    |(?:$regex_ipv6_only_gua)/xi;               ## or a standad or compressed IPv6 GUA address
+
 ######################################################################
 ## is_ipv6_gua() validates if string is valid IPv6 Global Unicast Address (GUA)
-## with no preceding or trailing spaces/characters. Accepts embedded
-## leading zeros by removing them for testing purposes.
+## with no preceding or trailing spaces/characters, not even line breaks.
 ######################################################################
 sub is_ipv6_gua {
-    my ($value) = @_;
-    return (length($value // '') != 0) &&
-        ((extract_ipv6_gua($value) // '') eq (($value =~ s/\b0+\B//g) ? $value : $value));
+    return ((shift // '') =~ /\A($regex_ipv6_gua)\z/) ne '';
 }
 
 ######################################################################
-## extract_ipv6_gua() extracts the first valid IPv6 Global Unicast Address (GUA)
-## from given string. IPv6 must be in standard or compressed format.
-## Mixed IPv6/IPv4 not supported.
-## Accepts leading zeros in the address but removes them in returned value
+## extract_ipv6_gua() finds the first valid IPv6 GUA address in the given
+## string, removes embedded leading zeros, and returns the result.
 ######################################################################
 sub extract_ipv6_gua {
-    my $regex = qr/(?<![:.\w])                          ## Negative lookbehind for word boundry
-        ( [23][A-F0-9]{3}:                              ## Starts with 2xxx: or 3xxx:
-          (?:[0-9A-F]{1,4}:){6}[0-9A-F]{1,4}            ##   in standard format
-         |(?=[23][A-F0-9]{3}:                           ## OR starts with 2xxx: or 3xxx:
-          (?:[0-9A-F]{0,4}:){0,6}[0-9A-F]{0,4}          ##   in compressed with at most 7 colons
-          (?![:.\w]))                                   ##   and negative lookahead for boundry
-          (?:(?:[0-9A-F]{1,4}:){1,7}|:)(?:(?::[0-9A-F]{1,4}){1,7}|:)  ## and only 1 double-colon
-         |[23][A-F0-9]{3}:                              ## OR starts with 2xxx: or 3xxx:
-          (?:[0-9A-F]{1,4}:){6}:                        ##    compressed with 8 colons (double at end)
-        )                                               ## End of first capture group
-        (?![:.\w])/xi;                                  ## Negative lookahead for boundry
-    (shift // '') =~ $regex or return undef;
+    (shift // '') =~ /($regex_ipv6_gua)/ or return undef;
     (my $ip = $1) =~ s/\b0+\B//g; ## remove embedded leading zeros
     return $ip;
 }
