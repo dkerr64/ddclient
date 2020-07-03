@@ -2848,6 +2848,11 @@ sub extract_ipv6 {
     return $ip;
 }
 
+######################################################################
+## Regex to find IPv6 GUA in standard, compressed format. Accepts
+## embedded leading zeros in the address. Adapted from regex in the
+## Regular Expressions Cookbook by J.Goyvaerets and S.Levithan
+######################################################################
 my $regex_ipv6_only_gua = qr/(?<![:.0-9A-Z]])   ## Negative lookbehind for word boundry
      [23][A-F0-9]{3}:                           ## Starts with 2xxx: or 3xxx:
      (?:[0-9A-F]{1,4}:){6}[0-9A-F]{1,4}         ##   in standard format
@@ -2859,6 +2864,10 @@ my $regex_ipv6_only_gua = qr/(?<![:.0-9A-Z]])   ## Negative lookbehind for word 
      (?:[0-9A-F]{1,4}:){6}:                     ##    compressed with 8 colons (double at end)
     (?![:.0-9A-Z]])/xi;                         ## Negative lookahead for boundry
 
+######################################################################
+## Mixed format IPv6 GUA have a IPv6 GUA prefix followed by a IPv4 address
+## This regex finds the prefix.
+######################################################################
 my $regex_ipv4_prefix_gua = qr/(?<![:.0-9A-Z])  ## Negative lookbehind for word boundry
      [23][A-F0-9]{3}:                           ## Starts with 2xxx: or 3xxx:
      (?:[A-F0-9]{1,4}:){5}                      ##   in standard non-compressed format
@@ -2870,7 +2879,9 @@ my $regex_ipv4_prefix_gua = qr/(?<![:.0-9A-Z])  ## Negative lookbehind for word 
     |[23][A-F0-9]{3}:                           ## OR starts with 2xxx: or 3xxx:
      (?:[A-F0-9]{1,4}:){4}/xi;                  ##    compressed with 6 colons and 5 numbers
 
-
+######################################################################
+## So now we can put it all together to find any format IPv6
+######################################################################
 my $regex_ipv6_gua = qr/
      (?:$regex_ipv4_prefix_gua)(?:$regex_ipv4)  ## Is it a mixed IPv6:v4 GUA address
     |(?:$regex_ipv6_only_gua)/xi;               ## or a standad or compressed IPv6 GUA address
