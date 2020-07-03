@@ -453,6 +453,17 @@ my @short_valid_ipv6 = (
     @valid_ipv6_lla,
 );
 
+my @valid_ipv6_gua = (
+    @valid_ipv6_gua,
+    @valid_mixed_ipv6_gua
+);
+
+my @valid_ipv6_not_gua = (
+    @valid_ipv6_ula,
+    @valid_ipv6_lla,
+    @valid_mixed_ipv6_non_gua,
+);
+
 # Sample output from ip: -6 -o addr show dev <interface> scope global
 # this seems to be consistent accross platforms
 my $ip_cmd =
@@ -576,6 +587,17 @@ foreach my $ip (@all_valid_ipv6) {
 # Run through a bunch of invalid IPv6 addresses
 foreach my $ip (@invalid_ipv6) {
     isnt(ddclient::is_ipv6($ip),1,"Testing invalid 'is_ipv6($ip)'");
+    isnt(ddclient::is_ipv6_gua($ip),1,"Testing invalid 'is_ipv6_gua($ip)'");
+}
+
+# Run through a bunch of valid GUA IPv6 addresses
+foreach my $ip (@valid_ipv6_gua) {
+    is(ddclient::is_ipv6_gua($ip),1,"Testing valid 'is_ipv6_gua($ip)'");
+}
+
+# Run through a bunch of valid IPv6 addresses that are not GUA
+foreach my $ip (@valid_ipv6_not_gua) {
+    isnt(ddclient::is_ipv6_gua($ip),1,"Testing valid IPv6 but not GUAs 'is_ipv6_gua($ip)'");
 }
 
 #######################################################################
@@ -599,16 +621,47 @@ foreach my $ip (@short_valid_ipv6) {
     }
 }
 
+## Do the same for GUA addresses...
+foreach my $ip (@valid_ipv6_gua) {
+    # Take valid IPv6 and wrap in some characters that should cause
+    # testing to fail.  e.g. slashes, periods, commas, colons, alpha (other than
+    # a-f which might still create a valid IPv6), even blank spaces (which
+    # should be rejected when testing strictly for only an IP address)
+    # first confirm that $ip is valid IPv6
+    is(ddclient::is_ipv6_gua($ip),1,"Testing valid 'is_ipv6_gua($ip)'");
+    my @chars = ('/','.',',',':','z',' ','@','$','#','&','%',"\n",'!','^','*','(',')','_','-','+');
+    my $test = "";
+    foreach my $ch (@chars) {
+        $test = $ch . $ip;  # insert at front
+        isnt(ddclient::is_ipv6_gua($test),1,"Testing invalid 'is_ipv6_gua($test)'");
+        $test = $ip . $ch;  # add at end
+        isnt(ddclient::is_ipv6_gua($test),1,"Testing invalid 'is_ipv6_gua($test)'");
+        $test = $ch . $ip . $ch; # wrap front and end
+        isnt(ddclient::is_ipv6_gua($test),1,"Testing invalid 'is_ipv6_gua($test)'");
+    }
+}
+
+# But we should be able to wrap the IP address in a word boundry char
+# and extract it.  Periods and colons don't count as they can be part
+# of an IPv6 address, but we do allow underscores.
 foreach my $ip (@short_valid_ipv6) {
-    # But we should be able to wrap the IP address in a word boundry char
-    # and extract it.  Periods and colons don't count as they can be part
-    # of an IPv6 address, but we do allow underscores.
     my @word_boundry = ('/',',',' ','@','$','#','&','%',"\n",'!','^','*','(',')','_','-','+');
     my $test = "";
     foreach my $wb (@word_boundry) {
         $test = "foo" . $wb . $ip . $wb . "bar"; # wrap front and end
         $ip =~ s/\b0+\B//g; ## remove embedded leading zeros for testing
         is(ddclient::extract_ipv6($test),$ip,"Extracted '$ip' from '$test'");
+    }
+}
+
+## Do the same for GUA addresses...
+foreach my $ip (@valid_ipv6_gua) {
+    my @word_boundry = ('/',',',' ','@','$','#','&','%',"\n",'!','^','*','(',')','_','-','+');
+    my $test = "";
+    foreach my $wb (@word_boundry) {
+        $test = "foo" . $wb . $ip . $wb . "bar"; # wrap front and end
+        $ip =~ s/\b0+\B//g; ## remove embedded leading zeros for testing
+        is(ddclient::extract_ipv6_gua($test),$ip,"Extracted '$ip' from '$test'");
     }
 }
 
@@ -621,19 +674,31 @@ foreach my $text (@if_samples) {
     # should get a valid IPv6 address back.
     my $ip = ddclient::extract_ipv6($text);
     is(ddclient::is_ipv6($ip),1,"Extracting '$ip' from sample ip/ifconfig");
-    # TODO Extract first GUA
+    # All of the samples have at least one GUA so this should work too...
+    $ip = ddclient::extract_ipv6_gua($text);
+    is(ddclient::is_ipv6_gua($ip),1,"Extracting GUA '$ip' from sample ip/ifconfig");
 
     # As we can have multi-line replies, we will test extracting the IPv6
     # from each line.
     my @text = split /\n/, $text;
     foreach my $line (@text) {
         my $ip = ddclient::extract_ipv6($line);
-        is(ddclient::is_ipv6($ip),1,"Extracting '$ip' from '$line'")
+        is(ddclient::is_ipv6($ip),1,"Extracting '$ip' from '$line'");
+        if (ddclient::is_ipv6_gua($ip)) {
+            # If we extraced a GUA we should get the same by explicitly extracting a GUA !
+            is(ddclient::extract_ipv6_gua($line),$ip,"Extracting GUA '$ip' from '$line'");
+        } else {
+            # But if it wasn't a GUA then we shouldn't be able to extract it with GUA specific fn.
+            isnt(ddclient::extract_ipv6_gua($line),$ip,"Not extracting non-GUA '$ip' from '$line'");
+        }
     }
 }
+
 isnt(ddclient::is_ipv4(undef),1,"Testing is_ipv4 with undef");
-isnt(ddclient::extract_ipv4(undef),1,"Testing extract_ipv4 with undef");
+is(ddclient::extract_ipv4(undef),undef,"Testing extract_ipv4 with undef");
 isnt(ddclient::is_ipv6(undef),1,"Testing is_ipv6 with undef");
-isnt(ddclient::extract_ipv6(undef),1,"Testing extract_ipv6 with undef");
+is(ddclient::extract_ipv6(undef),undef,"Testing extract_ipv6 with undef");
+isnt(ddclient::is_ipv6_gua(undef),1,"Testing is_ipv6_gua with undef");
+is(ddclient::extract_ipv6_gua(undef),undef,"Testing extract_ipv6_gua with undef");
 
 done_testing();
