@@ -3,6 +3,23 @@ use Test::More;
 SKIP: { eval { require Test::Warnings; } or skip($@, 1); }
 eval { require 'ddclient'; } or BAIL_OUT($@);
 
+
+my @valid_ipv4 = (
+    "192.168.1.1",
+    "0.0.0.0",
+    "000.000.000.000",
+    "255.255.255.255",
+    "10.0.0.0",
+);
+
+my @invalid_ipv4 = (
+    "192.168.1",
+    "0.0.0",
+    "000.000",
+    "256.256.256.256",
+    ".10.0.0.0",
+);
+
 # Note, for GUA addresses we use 2001:DB8::/32 as that is reserved for
 # documentation per RFC 3849 and so not routable on public internet.
 # But we do have to add some others starting in 3xxx:: because they 
@@ -407,6 +424,7 @@ my @all_valid_ipv6 = (
     @valid_ipv6_ula,
     @valid_ipv6_lla,
     @valid_ipv6,
+    @valid_mixed_ipv6,
 );
 
 my @short_valid_ipv6 = (
@@ -484,16 +502,55 @@ my @if_samples = (
 );
 
 
+
+#######################################################################
+## Run through a bunch of IPv4 addresses
+foreach my $ip (@valid_ipv4) {
+    is(ddclient::is_ipv4($ip),1,"Testing valid 'is_ipv4($ip)'");
+}
+
+#######################################################################
+## Run through a bunch of invalid IPv4 addresses
+foreach my $ip (@invalid_ipv4) {
+    isnt(ddclient::is_ipv4($ip),1,"Testing invalid 'is_ipv4($ip)'");
+}
+
+foreach my $ip (@valid_ipv4) {
+    # Take valid IPv4 and wrap in some characters that should cause
+    # testing to fail.  e.g. slashes, periods, commas, colons, alpha
+    # even blank spaces (which should be rejected when testing strictly
+    # for only an IP address) first confirm that $ip is valid IPv4
+    is(ddclient::is_ipv4($ip),1,"Testing valid 'is_ipv4($ip)'");
+    my @chars = ('/','.',',',':','z',' ','@','$','#','&','%',"\n",'!','^','*','(',')','_','-','+');
+    my $test = "";
+    foreach my $ch (@chars) {
+        $test = $ch . $ip;  # insert at front
+        isnt(ddclient::is_ipv4($test),1,"Testing invalid 'is_ipv4($test)'");
+        $test = $ip . $ch;  # add at end
+        isnt(ddclient::is_ipv4($test),1,"Testing invalid 'is_ipv4($test)'");
+        $test = $ch . $ip . $ch; # wrap front and end
+        isnt(ddclient::is_ipv4($test),1,"Testing invalid 'is_ipv4($test)'");
+    }
+}
+
+
+foreach my $ip (@valid_ipv4) {
+    # But we should be able to wrap the IP address in a word boundry char
+    # and extract it.  Periods don't count as they can be part of an
+    # IPv4 address, but we do allow underscores.
+    my @word_boundry = ('/',',',' ','@','$','#','&','%',"\n",'!','^','*','(',')','_','-','+',':');
+    my $test = "";
+    foreach my $wb (@word_boundry) {
+        $test = "foo" . $wb . $ip . $wb . "bar"; # wrap front and end
+        $ip =~ s/\b0+\B//g; ## remove embedded leading zeros for testing
+        is(ddclient::extract_ipv4($test),$ip,"Extracted '$ip' from '$test'");
+    }
+}
+
 #######################################################################
 ## Run through a bunch of IPv6 addresses
 foreach my $ip (@all_valid_ipv6) {
     is(ddclient::is_ipv6($ip),1,"Testing valid 'is_ipv6($ip)'");
-}
-
-# Run through valid mixed (IPv4 within IPv6 address).  We do not accept
-# this format so expect valid check to fail.
-foreach my $ip (@valid_mixed_ipv6) {
-    is(ddclient::is_ipv6($ip),1,"Testing valid mixed 'is_ipv6($ip)'");
 }
 
 # Run through a bunch of invalid IPv6 addresses
@@ -529,7 +586,7 @@ foreach my $ip (@short_valid_ipv6) {
     my @word_boundry = ('/',',',' ','@','$','#','&','%',"\n",'!','^','*','(',')','_','-','+');
     my $test = "";
     foreach my $wb (@word_boundry) {
-        $test = $wb . $ip . $wb; # wrap front and end
+        $test = "foo" . $wb . $ip . $wb . "bar"; # wrap front and end
         $ip =~ s/\b0+\B//g; ## remove embedded leading zeros for testing
         is(ddclient::extract_ipv6($test),$ip,"Extracted '$ip' from '$test'");
     }
