@@ -371,6 +371,7 @@ my %variables = (
         'retry'               => setv(T_BOOL,  0, 0, 0,                    undef),
         'force'               => setv(T_BOOL,  0, 0, 0,                    undef),
         'ssl'                 => setv(T_BOOL,  0, 0, 0,                    undef),
+        'curl'                => setv(T_BOOL,  0, 0, 0,                    undef),
         'ipv6'                => setv(T_BOOL,  0, 0, 0,                    undef),
         'syslog'              => setv(T_BOOL,  0, 0, 0,                    undef),
         'facility'            => setv(T_STRING,0, 0, 'daemon',             undef),
@@ -759,6 +760,7 @@ my @opt = (
     [ "ssl",         "!",  "-{no}ssl              : do updates over encrypted SSL connection" ],
     [ "ssl_ca_dir",  "=s", "-ssl_ca_dir           : directory containing certificates of trusted certificate authorities (default: auto-detect)" ],
     [ "ssl_ca_file", "=s", "-ssl_ca_file          : file containing certificates of trusted certificate authorities (default: auto-detect)" ],
+    [ "curl",        "!",  "-{no}curl             : use cURL for network connections (default nocurl)" ],
     [ "retry",       "!",  "-{no}retry            : retry failed updates." ],
     [ "force",       "!",  "-{no}force            : force an update even if the update may be unnecessary" ],
     [ "timeout",     "=i", "-timeout max          : wait at most 'max' seconds for the host to respond" ],
@@ -1985,10 +1987,15 @@ EOM
     }
     import JSON::PP (qw/decode_json/);
 }
+
 ######################################################################
 ## geturl
 ######################################################################
 sub geturl {
+    return opt('curl') ? fetch_via_curl(@_) : fetch_via_socket_io(@_);
+}
+
+sub fetch_via_socket_io {
     my ($params) = @_;
     my $proxy = $params->{proxy};
     my $url = $params->{url};
@@ -2139,6 +2146,157 @@ sub geturl {
         }
     }
     $0 = sprintf("%s - closed %s", $program, $peer_port_ipv);
+
+    ## during testing simulate reading the URL
+    if (opt('test')) {
+        my $filename = "$server/$url";
+        $filename =~ s|/|%2F|g;
+        if (opt('exec')) {
+            $reply = save_file("$savedir/$filename", $reply, 'unique');
+        } else {
+            $reply = load_file("$savedir/$filename");
+        }
+    }
+
+    $reply =~ s/\r//g if defined $reply;
+    return $reply;
+}
+
+######################################################################
+## geturl -- via curl
+######################################################################
+sub curl_cmd {
+    my @params = @_;
+    my $tmpfile;
+    my %curl_codes = (  ## Subset of error codes from https://curl.haxx.se/docs/manpage.html
+         3 => "URL malformed. The syntax was not correct",
+         5 => "Couldn't resolve proxy. The given proxy host could not be resolved.",
+         6 => "Couldn't resolve host. The given remote host was not resolved.",
+         7 => "Failed to connect to host.",
+        22 => "HTTP page not retrieved. The requested url was not found or returned another error.",
+        28 => "Operation timeout. The specified time-out period was reached according to the conditions.",
+        35 => "SSL connect error. The SSL handshaking failed.",
+        47 => "Too many redirects. When following redirects, curl hit the maximum amount.",
+        51 => "The peer's SSL certificate or SSH MD5 fingerprint was not OK.",
+        58 => "Problem with the local certificate.",
+        60 => "Peer certificate cannot be authenticated with known CA certificates.",
+        67 => "The user name, password, or similar was not accepted and curl failed to log in.",
+        77 => "Problem with reading the SSL CA cert (path? access rights?).",
+        78 => "The resource referenced in the URL does not exist.",
+    );
+
+    return '' if (scalar(@params) == 0); ## no parameters provided
+
+    # debug("CURL:\r\n%s\r\n",$params); ## Uncomment only if required as may expose credentials
+
+    eval "no warnings 'all'; use File::Temp;";
+    if (!$@) {
+        ## Use system File::Temp to generate filename...
+        $tmpfile = File::Temp->new(TMPDIR => 1,  ## in system temp dir
+                                   UNLINK => 0,  ## we will delete it ourselves
+                                 TEMPLATE => 'ddclient_XXXXXXXXXX');
+        ## File::Temp->new() automatically opens the file for us.
+    } else {
+        ## System does not have File::Temp so generate ourselves...
+        eval "no warnings 'all'; use File::Spec;";
+        $tmpfile = ((!$@) ? File::Spec->tmpdir() : '/tmp').'/ddclient_';
+        my @chars = ("A".."Z", "a".."z", "0".."9");
+        $tmpfile .= $chars[rand @chars] for 1..10;
+        open($tmpfile, '>', $tmpfile) or fatal("Falied to open $tmpfile for curl");
+    }
+    chmod(0600,$tmpfile);
+    debug("CURL Tempfile: %s",$tmpfile);
+    local $\ = "\n";  ## Terminate the file,
+    local $, = "\n";  ## and each parameter, with a newline.
+    print($tmpfile @params);
+    close($tmpfile);
+
+    ## Make sure to delete temp file on Ctrl-C or SIGTERM
+    local $SIG{'INT'} = sub { unlink($tmpfile); exit 2 };
+    local $SIG{'TERM'} = sub { unlink($tmpfile); exit 15 };
+    my $reply = qx{ /usr/bin/curl --config '$tmpfile' 2>/dev/null; };
+    if ((my $rc = $?>>8) != 0) {
+        warning("CURL error (%d) %s", $rc, $curl_codes{$rc} // "Unknown return code, check curl man page.");
+    }
+    unlink($tmpfile);
+    return $reply;
+}
+
+sub fetch_via_curl {
+    my ($params) = @_;
+    my $proxy = $params->{proxy};
+    my $url = $params->{url};
+    my $login = $params->{login};
+    my $password = $params->{password};
+    my $ipversion = $params->{ipversion} // '';
+    my $headers = $params->{headers} // '';
+    my $method = $params->{method} // 'GET';
+    my $data = $params->{data} // '';
+
+    my $reply;
+    my $server;
+    my $use_ssl = 0;
+    my $force_ssl = 0;
+    my $protocol;
+    my $timeout  = opt('timeout');
+    my @curlopt = ();
+    my @header_lines = ();
+
+    if (!`curl --version 2>/dev/null`) {
+        fatal("You requested network access with curl but curl is not installed.");
+    }
+
+    ## canonify proxy and url
+    $force_ssl = 1 if ($url =~ /^https:/);
+    $proxy  =~ s%^https?://%%i if defined($proxy);
+    $url    =~ s%^https?://%%i;
+    $server = $url;
+    $server =~ s%[?/].*%%;
+    $url    =~ s%^[^?/]*/?%%;
+
+    $use_ssl = 1 if ($force_ssl || ($globals{'ssl'} && !($params->{ignore_ssl_option} // 0)));
+
+    $protocol = ($use_ssl ? "https" : "http");
+
+    debug("proxy    = %s", $proxy // '<undefined>');
+    debug("protocol = %s", $protocol);
+    debug("server   = %s", $server);
+    debug("url      = %s", $url);
+    debug("ip ver   = %s", $ipversion);
+
+    if (!opt('exec')) {
+        debug("skipped network connection");
+        verbose("SENDING:", "%s", "${server}/${url}");
+    } else {
+        push(@curlopt, "silent");
+        push(@curlopt, "cacert=".opt('ssl_ca_file')) if defined(opt('ssl_ca_file'));
+        push(@curlopt, "capath=".opt('ssl_ca_dir')) if defined(opt('ssl_ca_dir'));
+        push(@curlopt, "ipv4") if ($ipversion eq '4');
+        push(@curlopt, "ipv6") if ($ipversion eq '6');
+        push(@curlopt, "user-agent=\"${program}/${version}\"");
+        push(@curlopt, "connect-timeout=$timeout");
+        push(@curlopt, "max-time=$timeout");
+        push(@curlopt, "request=$method");
+        push(@curlopt, "user=${login}:${password}") if (defined($login) && defined($password));
+        push(@curlopt, "proxy=\"${protocol}://${proxy}\"") if defined($proxy);
+        push(@curlopt, "url=\"${protocol}://${server}/${url}\"");
+        @header_lines = split('\n', $headers);
+        foreach (@header_lines) { s/"/\\"/g; $_ = "header=\"$_\"" };
+        push(@curlopt, @header_lines);
+        $data =~ s/"/\\"/g;  ## Escape double-quotes
+        push(@curlopt, "data=\"${data}\"") if ($data ne '');
+
+        # don't include ${url} as that might expose login credentials
+        $0 = sprintf("%s - curl sending to %s", $program, "${protocol}://${server}");
+        verbose("SENDING:", "curl to %s", "${protocol}://${server}");
+
+        $reply = curl_cmd(@curlopt);
+
+        if (!$reply) {
+            # don't include ${url} as that might expose login credentials
+            warning("curl cannot connect to %s://%s using IPv%s",${protocol},${server},$ipversion);
+        }
+    }
 
     ## during testing simulate reading the URL
     if (opt('test')) {
