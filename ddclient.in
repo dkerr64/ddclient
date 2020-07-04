@@ -2562,49 +2562,65 @@ sub extract_ipv6_gua {
 ######################################################################
 sub get_ip_from_interface {
     my $if = shift;
-    my $ipver = shift // 4;
-    my $reply = '';
+    my $ipver = shift // 4;   ## Defaults to IPv6 if not specified
+    my $reply = shift // '';  ## Pass in data for unit testing purposes only
+    my $MacOS = shift // 0;   ## For testing can set to 1 if input data is MacOS format
     my $count = 0;
 
     if ($ipver == 4) {
-        ## Try ip first, then ifconfig
-        $reply = `command -v ip >/dev/null && ip -4 -o addr show dev $if scope global 2>/dev/null`;
-        $reply = `command -v ifconfig >/dev/null && ifconfig $if 2>/dev/null | grep -w "inet"` if $?;
-        if ($?) {
-            failed("Neither 'ip' or 'ifconfig' commands available on system.");
-            return undef;
+        if ($reply eq '') { ## skip if test data passed in.
+            ## Try ip first, then ifconfig.
+            $reply = `command -v ip >/dev/null && ip -4 -o addr show dev $if scope global 2>/dev/null`;
+            $reply = `command -v ifconfig >/dev/null && ifconfig $if 2>/dev/null | grep -w "inet"` if $?;
         }
+        failed("Unable to obtain information for '%s' -- missing ip or ifconfig commands?",$if) if $?;
+        ## IPv4 is simple, we just need to find the first IPv4 address returned in the list.
+        debug("Raw IPv4 address information for %s:\r\n%s",$if,$reply);
         return extract_ipv4($reply);
     }
     if ($ipver != 6) {
-        debug("get_ip_from_interface() invalid IP version: %s",$ipver);
+        warning("get_ip_from_interface() invalid IP version: %s",$ipver);
         return undef;
     }
-    ## Try ip first, then ifconfig with -L for MacOS then finally ifconfig for everything else
-    $reply = `command -v ip >/dev/null && ip -6 -o addr show dev $if scope global 2>/dev/null | grep -v "deprecated" | grep -v "temporary"`;
-    $reply = `command -v ifconfig >/dev/null && ifconfig -L $if 2>/dev/null | grep -w "inet6" | grep -v "deprecated" | grep -v "temporary"` if $?;
-    $reply = `command -v ifconfig >/dev/null && ifconfig $if 2>/dev/null | grep -w "inet6"` if $?;
-    if ($?) {
-        failed("Neither 'ip' or 'ifconfig' commands available on system.");
-        return undef;
+
+    ## From this point on we only looking for IPv6 address.
+    ## This is much more complex than IPv4
+    if ($reply eq '') { ## skip if test data passed in.
+        ## Try ip first, then ifconfig with -L for MacOS then finally ifconfig for everything else
+        $reply = `command -v ip >/dev/null && ip -6 -o addr show dev $if scope global 2>/dev/null`;
+        (($reply = `command -v ifconfig >/dev/null && ifconfig -L $if 2>/dev/null`) && ($MacOS = 1)) if $?;
+        $reply = `command -v ifconfig >/dev/null && ifconfig $if 2>/dev/null` if $?;
     }
-    debug("IP address information for %s:\r\n%s\r\n",$if,$reply);
+    failed("Unable to obtain information for '%s' -- missing ip or ifconfig commands?",$if) if $?;
+    debug("Detected we're probably running on MacOS") if ($MacOS == 1);
 
     my @reply = split(/\n/, $reply);
-    ## We only accept IPv6 Global Unicast Addresses (GUA) so filter on those.
-    @reply = grep(/$regex_ipv6_gua/, @reply);
-    ## If there are none return undef
-    return undef if (($count = scalar(@reply)) == 0);
-    ## If there is only one then we're done.
-    return extract_ipv6($reply[0]) if ($count == 1);
-    ## If there are more than one we need to select the "best"
-    ## First choice would be a static address, or one with a "forever" life.
-    ## This only works for iproute2 or MacOS version of ifconfig (others
-    my @forever = grep(/^.*\bvalid_lft.\bforever\b.*$/i, @reply);
-    ## If there is only one then we're done.
-    return extract_ipv6($forever[0]) if (($count = scalar(@forever)) == 1);
-    ## If more than one we'll sort through the forevers, else keep the list we have
-    @reply = @forever if ($count > 1);
+    @reply = grep(/\binet6\b/, @reply);
+    debug("Raw IPv6 address information for %s: (%s)\r\n%s",$if,scalar(@reply),join("\n",@reply));
+    @reply = grep(!/\bdeprecated\b|\btemporary\b/, @reply);  ## remove depreciated or temporary addresses
+    debug("After removing deprecated and temporary addresses %s: (%s)\r\n%s",$if,scalar(@reply),join("\n",@reply));
+    @reply = grep(/$regex_ipv6_gua/, @reply); ## We only accept IPv6 Global Unicast Addresses (GUA) so filter on those.
+    debug("After filtering for GUA addresses %s: (%s)\r\n%s",$if,scalar(@reply),join("\n",@reply));
+
+    return undef if (($count = scalar(@reply)) == 0); ## If there are none return undef
+    return extract_ipv6($reply[0]) if ($count == 1);  ## If there is only one then we're done
+
+    ## If there are more than one we need to select the "best". First choice would be a static address.
+    my @static = ();
+    if ($MacOS == 1) {
+        ## This only works for MacOS version of ifconfig
+        @static = grep(!/^.*\bvltime\b.*$/i, @reply);
+    }
+    else {
+        ## This only works for iproute2
+        @static = grep(/^.*\bvalid_lft.\bforever\b.*$/i, @reply);
+    }
+    $count = scalar(@static);
+    debug("Possible Static IP addresses %s: (%s)\r\n%s",$if,$count,join("\n",@static));
+
+    return extract_ipv6($static[0]) if ($count == 1); ## If there is only one then we're done
+    @reply = @static if ($count > 1);  ## If more than one we'll sort through the statics.
+
     ## Sort what we have by the prefix length, IP address "length" and finally valid life.
     my @sorted = sort {
         ## We give preference to IP addressess with the longest prefix...
@@ -2613,11 +2629,11 @@ sub get_ip_from_interface {
         ## theory that a shorter address is more likely assigned by DHCPv6 than SLAAC.
         ## E.g. 2001:db8:4341:0781::8214/64 is preferable to 2001:DB8:4341:0781:34a6:c329:c52e:8ba6/64
      || (()= (extract_ipv6($a) // '') =~ /[0-9A-F]+/gi) <=> (()= (extract_ipv6($b) // '') =~ /[0-9A-F]+/gi)
-        ## Finally we sort by remaining valid lifetime which only works with iproute2
-        ## or on MacOS (if -L flag used on ifconfig)
+        ## Finally we sort by remaining valid lifetime which only works with iproute2 or MacOS
      || (($b =~ /(?:\bvalid_lft\b\s*|\bvltime\b\s*)(\d+)/i)[0] // 0) <=> (($a =~ /(?:\bvalid_lft\b\s*|\bvltime\b\s*)(\d+)/i)[0] // 0)
     } @reply;
-    debug("Sorted list of IP addresss for %s:\r\n%s\r\n",$if,join('\n',@sorted));
+    debug("Sorted list of IP addresss for %s: (%s)\r\n%s",$if,scalar(@sorted),join("\n",@sorted));
+
     ## Whatever sorted to the top is the "best" choice for IPv6 address
     return extract_ipv6_gua($sorted[0]);
 }
