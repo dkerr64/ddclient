@@ -66,7 +66,8 @@ local $lineno = '';
 
 $ENV{'PATH'} = (exists($ENV{PATH}) ? "$ENV{PATH}:" : "") . "/sbin:/usr/sbin:/bin:/usr/bin:/etc:/usr/lib:";
 
-my ($result, %config, %globals, %cache);
+our %globals;
+my ($result, %config, %cache);
 my $saved_cache;
 my %saved_opt;
 my $daemon;
@@ -442,6 +443,8 @@ my %variables = (
         'geturl'              => setv(T_STRING,0, 0, '',                   undef),
 
         'postscript'          => setv(T_POSTS, 0, 0, '',                   undef),
+        'ssl_ca_dir'          => setv(T_FILE,  0, 0, undef,                undef),
+        'ssl_ca_file'         => setv(T_FILE,  0, 0, undef,                undef),
     },
     'service-common-defaults' => {
         'server'              => setv(T_FQDNP, 1, 0, 'members.dyndns.org', undef),
@@ -865,6 +868,8 @@ my @opt = (
     "",
     [ "ssl",         "!",  "-{no}ssl              : do updates over encrypted SSL connection" ],
     [ "curl",        "!",  "-{no}curl             : use cURL for network connections (default nocurl)" ],
+    [ "ssl_ca_dir",  "=s", "-ssl_ca_dir           : directory containing certificates of trusted certificate authorities (default: auto-detect)" ],
+    [ "ssl_ca_file", "=s", "-ssl_ca_file          : file containing certificates of trusted certificate authorities (default: auto-detect)" ],
     [ "retry",       "!",  "-{no}retry            : retry failed updates." ],
     [ "force",       "!",  "-{no}force            : force an update even if the update may be unnecessary" ],
     [ "timeout",     "=i", "-timeout max          : wait at most 'max' seconds for the host to respond" ],
@@ -1194,11 +1199,10 @@ sub read_cache {
 sub parse_assignments {
     my ($rest) = @_;
     my %variables = ();
-    my ($name, $value);
 
     while (1) {
-        $rest =~ s/^\s+//;
-        ($name, $value, $rest) = parse_assignment($rest);
+        (my $name, my $value, $rest) = parse_assignment($rest);
+        $rest =~ s/^[,\s]+//;
         if (defined $name) {
             if ($name eq 'fw-banlocal') {
                 warning("'fw-banlocal' is deprecated and does nothing");
@@ -1213,14 +1217,13 @@ sub parse_assignments {
 }
 sub parse_assignment {
     my ($rest) = @_;
-    my ($c, $name, $value);
+    my ($name, $value);
     my ($escape, $quote) = (0, '');
 
-    if ($rest =~ /^\s*([a-z][0-9a-z_-]*)=(.*)/i) {
+    if ($rest =~ /^[,\s]*([a-z][0-9a-z_-]*)=(.*)/i) {
         ($name, $rest, $value) = ($1, $2, '');
 
-        while (length($c = substr($rest, 0, 1))) {
-            $rest = substr($rest,1);
+        while (length(my $c = substr($rest, 0, 1))) {
             if ($escape) {
                 $value .= $c;
                 $escape = 0;
@@ -1231,13 +1234,16 @@ sub parse_assignment {
             } elsif (!$quote && $c =~ /[\'\"]/) {
                 $quote = $c;
             } elsif (!$quote && $c =~ /^[\n\s,]/) {
+                # The terminating character is not consumed.
                 last;
             } else {
                 $value .= $c;
             }
+            $rest = substr($rest,1);
         }
     }
-    warning("assignment ended with an open quote") if $quote;
+    warning("assignment to '%s' ended with the escape character (\\)", $name) if $escape;
+    warning("assignment to '%s' ended with an unterminated quote (%s)", $name, $quote) if $quote;
     return ($name, $value, $rest);
 }
 ######################################################################
@@ -2225,19 +2231,18 @@ sub geturl {
     $proxy  =~ s%^https?://%%i;
     $url    =~ s%^https?://%%i;
     $server = $url;
-    $server =~ s%/.*%%;
-    $url    = "/" unless $url =~ m%/%;
-    $url    =~ s%^[^/]*/%%;
+    $server =~ s%[?/].*%%;
+    $url    =~ s%^[^?/]*/?%%;
 
     opt('fw') && debug("opt(fw = %s)", opt('fw'));
     $globals{'fw'} && debug("glo fw = %s", $globals{'fw'});
     ## always omit SSL for connections to local router
-    if ($force_ssl || ($globals{'ssl'} and (caller(1))[3] ne 'main::get_ip')) {
+    if ($force_ssl || ($globals{'ssl'} && ((caller(1))[3] // '') ne 'main::get_ip')) {
         $use_ssl      = 1;
-        $default_port = 443;
+        $default_port = '443';
     } else {
         $use_ssl      = 0;
-        $default_port = 80;
+        $default_port = '80';
     }
     debug("proxy    = %s", $proxy);
     debug("protocol = %s", $use_ssl ? "https" : "http");
@@ -2307,11 +2312,14 @@ USE_CURL
         # TODO indent section...
     ## determine peer and port to use.
     $peer = $proxy || $server;
-    $peer =~ s%/.*%%;
-    $port = $peer;
-    $port =~ s%^.*:%%;
-    $port = $default_port unless $port =~ /^\d+$/;
-    $peer =~ s%:.*$%%;
+    $peer =~ s%[?/].*%%;
+    if ($peer =~ /^\[([^]]+)\](?::(\d+))?$/ || $peer =~ /^([^:]+)(?::(\d+))?/) {
+        $peer = $1;
+        $port = $2 // $default_port;
+    } else {
+        failed("unable to extract host and port from %s", $peer);
+        return undef;
+    }
 
     $request = "$method ";
     if (!$use_ssl) {
@@ -2338,15 +2346,6 @@ USE_CURL
     $request .= $data;
     $rq .= $data;
 
-    my $socket_class = 'IO::Socket::INET';
-    if ($use_ssl) {
-        # IO::Socket::SSL will load IPv6 support if available on the system.
-        load_ssl_support;
-        $socket_class = 'IO::Socket::SSL';
-    } elsif ($globals{'ipv6'} || $ipversion eq '6') {
-        load_ipv6_support;
-        $socket_class = 'IO::Socket::INET6';
-    }
     my %socket_args = (
         PeerAddr => $peer,
         PeerPort => $port,
@@ -2354,6 +2353,17 @@ USE_CURL
         MultiHomed => 1,
         Timeout => opt('timeout'),
     );
+    my $socket_class = 'IO::Socket::INET';
+    if ($use_ssl) {
+        # IO::Socket::SSL will load IPv6 support if available on the system.
+        load_ssl_support;
+        $socket_class = 'IO::Socket::SSL';
+        $socket_args{SSL_ca_file} = opt('ssl_ca_file') if defined(opt('ssl_ca_file'));
+        $socket_args{SSL_ca_path} = opt('ssl_ca_dir') if defined(opt('ssl_ca_dir'));
+    } elsif ($globals{'ipv6'} || $ipversion eq '6') {
+        load_ipv6_support;
+        $socket_class = 'IO::Socket::INET6';
+    }
     if ($ipversion eq '4') {
         $socket_args{Domain} = PF_INET;
         $socket_args{Family} = AF_INET;

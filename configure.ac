@@ -16,6 +16,17 @@ AM_SILENT_RULES
 
 AC_PROG_MKDIR_P
 
+# The Fedora Docker image doesn't come with the 'findutils' package.
+# 'find' is required for 'make distcheck', which the user might not
+# run. We could log a warning instead of erroring out, but:
+#   * a warning is unlikely to be seen,
+#   * 'make distcheck' doesn't yield a non-0 exit code if 'find' is
+#     not available,
+#   * 'find' is a core utility that should always be available, and
+#   * we might use 'find' for other purposes in the future.
+AC_PATH_PROG([FIND], [find])
+AS_IF([test -z "${FIND}"], [AC_MSG_ERROR(['find' utility not found])])
+
 AX_WITH_PROG([PERL], perl)
 AX_PROG_PERL_VERSION([5.10.1], [],
   [AC_MSG_ERROR([Perl 5.10.1 or newer not found])])
@@ -30,10 +41,29 @@ m4_foreach_w([_m], [
   ], [AX_PROG_PERL_MODULES([_m], [],
          [AC_MSG_ERROR([missing required Perl module _m])])])
 
-# Perl modules required for tests. Only prints a warning if not
-# installed.
+# Perl modules required for tests. If these modules are not installed
+# then some tests will fail. Only prints a warning if not installed.
 m4_foreach_w([_m], [
+    Data::Dumper
+    Test::More
+  ], [AX_PROG_PERL_MODULES([_m], [],
+         [AC_MSG_WARN([some tests will fail due to missing module _m])])])
+
+# Optional Perl modules for tests. If these modules are not installed
+# then some tests will be skipped, but no tests should fail. Only
+# prints a warning if not installed.
+m4_foreach_w([_m], [
+    Carp
+    Exporter
+    HTTP::Daemon=6.12
+    HTTP::Daemon::SSL
+    HTTP::Message::PSGI
+    IO::Socket::IP
+    Scalar::Util
+    Test::TCP
     Test::Warnings
+    Time::HiRes
+    URI
   ], [AX_PROG_PERL_MODULES([_m], [],
          [AC_MSG_WARN([some tests may be skipped due to missing module _m])])])
 
