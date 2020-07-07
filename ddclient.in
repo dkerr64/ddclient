@@ -5391,6 +5391,7 @@ sub nic_duckdns_update {
         }
     }
 }
+
 ######################################################################
 ## nic_he_examples
 ##
@@ -5400,24 +5401,13 @@ sub nic_duckdns_update {
 sub nic_he_examples {
     return <<"EoEXAMPLE";
 o 'he'
-=======
-        # No response, declare as failed
-        if (!defined($reply) || !$reply) {
-            failed("updating %s: Could not connect to %s.", $h, $config{$h}{'server'});
-            next;
-        }
-        next if !header_ok($h, $reply);
->>>>>>> ca1b519444aafe346341800ad80765b72aca0efb
-
 The 'he' protocol is the protocol used by the free dynamic
 DNS service offered by Hurricane Electric at https://dns.he.net
-
 Configuration variables applicable to the 'he' protocol are:
   protocol=he                  ##
   login=fully.qualified.host   ## the fully qualified hostname
   password=my-genereated-key   ## the password provided by the admin interface
   fully.qualified.host         ## the fully qualified hostname
-
 Example ${program}.conf file entries:
   ## single host update
   protocol=he,                                      \\
