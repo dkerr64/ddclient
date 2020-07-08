@@ -74,6 +74,10 @@ my ($result, %config, %cache);
 my $saved_cache;
 my %saved_opt;
 my $daemon;
+## Following used to control exiting daemon if SIGHUP, SIGINT, SIGTERM received.
+my $caught_hup  = 0;
+my $caught_term = 0;
+my $caught_int  = 0;
 
 sub T_ANY    { 'any' }
 sub T_STRING { 'string' }
@@ -808,9 +812,6 @@ sub main {
     init_config();
     test_possible_ip() if opt('query');
 
-    my $caught_hup  = 0;
-    my $caught_term = 0;
-    my $caught_int  = 0;
     $SIG{'HUP'}  = sub { $caught_hup  = 1; };
     $SIG{'TERM'} = sub { $caught_term = 1; };
     $SIG{'INT'}  = sub { $caught_int  = 1; };
@@ -2212,8 +2213,9 @@ sub curl_cmd {
     close($tmpfile);
 
     ## Make sure to delete temp file on Ctrl-C or SIGTERM
-    local $SIG{'INT'} = sub { unlink($tmpfile); exit 2 };
-    local $SIG{'TERM'} = sub { unlink($tmpfile); exit 15 };
+    local $SIG{'HUP'} = sub { unlink($tmpfile); $caught_hup = 1; exit 1 if !$daemon; };
+    local $SIG{'INT'} = sub { unlink($tmpfile); $caught_term = 1; exit 2 if !$daemon; };
+    local $SIG{'TERM'} = sub { unlink($tmpfile); $caught_int = 1; exit 15 if !$daemon; };
     my $reply = qx{ /usr/bin/curl --config '$tmpfile' 2>/dev/null; };
     if ((my $rc = $?>>8) != 0) {
         warning("CURL error (%d) %s", $rc, $curl_codes{$rc} // "Unknown return code, check curl man page.");
