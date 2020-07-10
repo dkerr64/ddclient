@@ -23,50 +23,6 @@ my @invalid_ipv4 = (
     ".10.0.0.0",
 );
 
-# Note, for GUA addresses we use 2001:DB8::/32 as that is reserved for
-# documentation per RFC 3849 and so not routable on public internet.
-# But we do have to add some others starting in 3xxx:: because they
-# are also valid GUA.
-my @valid_ipv6_gua = (
-    "2000::",
-    "2001:DB8:4341:0781:1111:2222:3333:4444",
-    "2001:DB8:4341:0781::4444",
-    "2001:DB8:4341:0781:1111::",
-    "2001:DB8:4341:0781::100",
-    "2001:DB8:4341:0781::1",
-    "2001:DB8:4341:0781::0001",
-    "2fff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
-    "3000::",
-    "3001:DB8:4341:0781:1111:2222:3333:4444",
-    "3001:DB8:4341:0781::4444",
-    "3001:DB8:4341:0781:1111::",
-    "3001:DB8:4341:0781::100",
-    "3001:DB8:4341:0781::1",
-    "3001:DB8:4341:0781::0001",
-    "3fff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
-);
-
-# For ULA addresses we randomly generated a /48 prefix per RFC 4193
-# and are using subnet ID of 1 because why not.
-my @valid_ipv6_ula = (
-    "fd00::",
-    "fdb6:1d86:d9bd:1:1111:2222:3333:4444",
-    "fdb6:1d86:d9bd:1::4444",
-    "fdb6:1d86:d9bd:1:1111::",
-    "fdb6:1d86:d9bd:1::100",
-    "fdb6:1d86:d9bd:1::1",
-    "fdb6:1d86:d9bd:1::0001",
-    "fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
-);
-
-my @valid_ipv6_lla = (
-    "fe80::",
-    "fe80::1111:2222:3333:4444",
-    "fe80::4444",
-    "fe80::1111",
-    "febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
-);
-
 my @valid_ipv6 = (
     "::abcd:efAB:CDEF",  # case sensitivity
     "08:09:0a:0b:0c:0d:0e:0f",  # leading zeros
@@ -109,10 +65,7 @@ my @valid_ipv6 = (
     "1111::3333:4444:5555:6666:7777:8888",
     "::3333:4444:5555:6666:7777:8888",
     "::2222:3333:4444:5555:6666:7777:8888",
-);
-
-my @valid_mixed_ipv6_non_gua = (
-    # with thanks to http://home.deds.nl/~aeron/regex/valid_ipv6.txt
+    # IPv4-mapped IPv6 addresses
     "1111:2222:3333:4444:5555:6666:0.0.0.0",
     "1111:2222:3333:4444:5555:6666:00.00.00.00",
     "1111:2222:3333:4444:5555:6666:000.000.000.000",
@@ -138,25 +91,6 @@ my @valid_mixed_ipv6_non_gua = (
     "1111::3333:4444:5555:6666:123.123.123.123",
     "::3333:4444:5555:6666:123.123.123.123",
     "::2222:3333:4444:5555:6666:123.123.123.123",
-);
-
-my @valid_mixed_ipv6_gua = (
-    "2111:2222:3333:4444:5555:6666:123.123.123.123",
-    "2111:2222:3333:4444:5555::123.123.123.123",
-    "2111:2222:3333:4444::123.123.123.123",
-    "2111:2222:3333::123.123.123.123",
-    "2111:2222::123.123.123.123",
-    "2111::123.123.123.123",
-    "2111:2222:3333:4444::6666:123.123.123.123",
-    "2111:2222:3333::6666:123.123.123.123",
-    "2111:2222::6666:123.123.123.123",
-    "2111::6666:123.123.123.123",
-    "2111:2222:3333::5555:6666:123.123.123.123",
-    "2111:2222::5555:6666:123.123.123.123",
-    "2111::5555:6666:123.123.123.123",
-    "2111:2222::4444:5555:6666:123.123.123.123",
-    "2111::4444:5555:6666:123.123.123.123",
-    "2111::3333:4444:5555:6666:123.123.123.123",
 );
 
 my @invalid_ipv6 = (
@@ -445,21 +379,6 @@ my @invalid_ipv6 = (
     "::2222:3333:4444:5555:6666:7777:8888:",
 );
 
-my @all_valid_ipv6 = (
-    @valid_ipv6_gua,
-    @valid_ipv6_ula,
-    @valid_ipv6_lla,
-    @valid_ipv6,
-    @valid_mixed_ipv6_non_gua,
-    @valid_mixed_ipv6_gua
-);
-
-my @short_valid_ipv6 = (
-    @valid_ipv6_gua,
-    @valid_ipv6_ula,
-    @valid_ipv6_lla,
-);
-
 my @if_samples = (
     # Sample output from:
     #   ip -6 -o addr show dev <interface> scope global
@@ -572,7 +491,7 @@ subtest "extract_ipv4() of valid addr with adjacent non-word char" => sub {
 };
 
 subtest "is_ipv6() with valid addresses" => sub {
-    foreach my $ip (@all_valid_ipv6) {
+    foreach my $ip (@valid_ipv6) {
         ok(ddclient::is_ipv6($ip), "is_ipv6('$ip')");
     }
 };
@@ -586,7 +505,7 @@ subtest "is_ipv6() with invalid addresses" => sub {
 subtest "is_ipv6() with char adjacent to valid address" => sub {
     foreach my $ch (split(//, '/.,:z @$#&%!^*()_-+'), "\n") {
         subtest perlstring($ch) => sub {
-            foreach my $ip (@short_valid_ipv6) {
+            foreach my $ip (@valid_ipv6) {
                 subtest $ip => sub {
                     my $test = $ch . $ip;  # insert at front
                     ok(!ddclient::is_ipv6($test), "!is_ipv6('$test')");
@@ -620,7 +539,7 @@ subtest "extract_ipv6() of valid addr with adjacent non-word char" => sub {
     foreach my $wb (split(//, '/, @$#&%!^*()_-+'), "\n") {
         subtest perlstring($wb) => sub {
             my $test = "";
-            foreach my $ip (@short_valid_ipv6) {
+            foreach my $ip (@valid_ipv6) {
                 $test = "foo" . $wb . $ip . $wb . "bar"; # wrap front and end
                 $ip =~ s/\b0+\B//g; ## remove embedded leading zeros for testing
                 is(ddclient::extract_ipv6($test), $ip, perlstring($test));
