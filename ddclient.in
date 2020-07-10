@@ -2333,7 +2333,7 @@ my $regex_ipv6 = qr/
 ## or trailing spaces/characters, not even line breaks.
 ######################################################################
 sub is_ipv4 {
-    return ((shift // '') =~ /\A($regex_ipv4)\z/) ne '';
+    return (shift // '') =~ /\A$regex_ipv4\z/;
 }
 
 ######################################################################
@@ -2351,7 +2351,7 @@ sub extract_ipv4 {
 ## or trailing spaces/characters, not even line breaks.
 ######################################################################
 sub is_ipv6 {
-    return ((shift // '') =~ /\A($regex_ipv6)\z/) ne '';
+    return (shift // '') =~ /\A$regex_ipv6\z/;
 }
 
 ######################################################################
