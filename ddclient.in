@@ -410,6 +410,7 @@ my %variables = (
         'fw-skip'             => setv(T_STRING,0, 0, '',                   undef),
         'fw-login'            => setv(T_LOGIN, 0, 0, '',                   undef),
         'fw-password'         => setv(T_PASSWD,0, 0, '',                   undef),
+        'ssl-validate'        => setv(T_BOOL,  0, 0, 1,                    undef),
         'cmd'                 => setv(T_PROG,  0, 0, '',                   undef),
         'cmd-skip'            => setv(T_STRING,0, 0, '',                   undef),
         'ipv6'                => setv(T_BOOL,  0, 0, 0,                    undef),
@@ -764,6 +765,7 @@ my @opt = (
     [ "ssl",         "!",  "-{no}ssl              : do updates over encrypted SSL connection" ],
     [ "ssl_ca_dir",  "=s", "-ssl_ca_dir           : directory containing certificates of trusted certificate authorities (default: auto-detect)" ],
     [ "ssl_ca_file", "=s", "-ssl_ca_file          : file containing certificates of trusted certificate authorities (default: auto-detect)" ],
+    [ "ssl-validate","!",  "-{no}ssl-validate     : Validate SSL certificate when retrieving IP address from web or firewall (default: yes)" ],
     [ "curl",        "!",  "-{no}curl             : use cURL for network connections (default nocurl)" ],
     [ "retry",       "!",  "-{no}retry            : retry failed updates." ],
     [ "force",       "!",  "-{no}force            : force an update even if the update may be unnecessary" ],
@@ -2188,7 +2190,7 @@ sub curl_cmd {
 
     return '' if (scalar(@params) == 0); ## no parameters provided
 
-    # debug("CURL:\r\n%s\r\n",$params); ## Uncomment only if required as may expose credentials
+    # debug("CURL: %s\r\n",join("\r\n      ",@params)); ## Uncomment only if required as may expose credentials
 
     eval "no warnings 'all'; use File::Temp;";
     if (!$@) {
@@ -2271,6 +2273,7 @@ sub fetch_via_curl {
         verbose("SENDING:", "%s", "${server}/${url}");
     } else {
         push(@curlopt, "silent");
+        push(@curlopt, "insecure") if ($use_ssl && !($params->{ssl_validate} // 1));
         push(@curlopt, "cacert=".opt('ssl_ca_file')) if defined(opt('ssl_ca_file'));
         push(@curlopt, "capath=".opt('ssl_ca_dir')) if defined(opt('ssl_ca_dir'));
         push(@curlopt, "ipv4") if ($ipversion eq '4');
@@ -2356,7 +2359,11 @@ sub get_ip {
         $arg = $url;
 
         if ($url) {
-            $reply = geturl({ proxy => opt('proxy', $h), url => $url }) // '';
+            $reply = geturl({
+                proxy => opt('proxy', $h),
+                url => $url,
+                ssl_validate => opt('ssl-validate', $h),
+            }) // '';
         }
 
     } elsif (($use eq 'cisco')) {
@@ -2378,6 +2385,7 @@ sub get_ip {
             login => opt('fw-login', $h),
             password => opt('fw-password', $h),
             ignore_ssl_option => 1,
+            ssl_validate => opt('ssl-validate', $h),
         }) // '';
         $arg = $url;
 
@@ -2400,6 +2408,7 @@ sub get_ip {
             login => opt('fw-login', $h),
             password => opt('fw-password', $h),
             ignore_ssl_option => 1,
+            ssl_validate => opt('ssl-validate', $h),
         }) // '';
         $arg = $url;
 
@@ -2419,6 +2428,7 @@ sub get_ip {
                 login => opt('fw-login', $h),
                 password => opt('fw-password', $h),
                 ignore_ssl_option => 1,
+                ssl_validate => opt('ssl-validate', $h),
             }) // '';
         }
     }
