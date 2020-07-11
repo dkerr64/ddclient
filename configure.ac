@@ -49,6 +49,7 @@ m4_foreach_w([_m], [
 # Perl modules required for tests. If these modules are not installed
 # then some tests will fail. Only prints a warning if not installed.
 m4_foreach_w([_m], [
+    B
     Data::Dumper
     File::Spec::Functions
     File::Temp
@@ -64,8 +65,12 @@ m4_foreach_w([_m], [
     HTTP::Daemon=6.12
     HTTP::Daemon::SSL
     HTTP::Message::PSGI
+    HTTP::Request
+    HTTP::Response
+    IO::Socket::INET6
     IO::Socket::IP
     Scalar::Util
+    Test::MockModule
     Test::TCP
     Test::Warnings
     Time::HiRes

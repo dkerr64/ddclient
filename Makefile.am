@@ -67,16 +67,21 @@ PL_LOG_DRIVER = $(LOG_DRIVER)
 PL_LOG_COMPILER = $(PERL)
 AM_PL_LOG_FLAGS = -Mstrict -w \
 	-I'$(abs_top_builddir)' \
-	-I'$(abs_top_srcdir)'/t/lib
+	-I'$(abs_top_srcdir)'/t/lib \
+	-MDevel::Autoflush
 handwritten_tests = \
 	t/is-and-extract-ipv6.pl \
 	t/geturl_connectivity.pl \
+	t/geturl_ssl.pl \
+	t/is-and-extract-ipv4.pl \
+	t/is-and-extract-ipv6.pl \
 	t/parse_assignments.pl \
 	t/write_cache.pl
 generated_tests = \
 	t/version.pl
 TESTS = $(handwritten_tests) $(generated_tests)
 EXTRA_DIST += $(handwritten_tests) \
+	t/lib/Devel/Autoflush.pm \
 	t/lib/Test/Builder.pm \
 	t/lib/Test/Builder/Formatter.pm \
 	t/lib/Test/Builder/IO/Scalar.pm \
