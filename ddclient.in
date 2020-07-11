@@ -2165,7 +2165,9 @@ sub fetch_via_socket_io {
 sub curl_cmd {
     my @params = @_;
     my $tmpfile;
+    my $tfh;
     my %curl_codes = (  ## Subset of error codes from https://curl.haxx.se/docs/manpage.html
+         2 => "Failed to initialize. (Most likely a bug in ddclient, please open issue at https://github.com/ddclient/ddclient)",
          3 => "URL malformed. The syntax was not correct",
          5 => "Couldn't resolve proxy. The given proxy host could not be resolved.",
          6 => "Couldn't resolve host. The given remote host was not resolved.",
@@ -2189,24 +2191,24 @@ sub curl_cmd {
     eval "no warnings 'all'; use File::Temp;";
     if (!$@) {
         ## Use system File::Temp to generate filename...
-        $tmpfile = File::Temp->new(TMPDIR => 1,  ## in system temp dir
-                                   UNLINK => 0,  ## we will delete it ourselves
-                                 TEMPLATE => 'ddclient_XXXXXXXXXX');
-        ## File::Temp->new() automatically opens the file for us.
+        $tfh = File::Temp->new( TMPDIR => 1,  ## in system temp dir
+                                UNLINK => 0,  ## we will delete it ourselves
+                                TEMPLATE => 'ddclient_XXXXXXXXXX');
+        $tmpfile = $tfh->filename;
     } else {
         ## System does not have File::Temp so generate ourselves...
         eval "no warnings 'all'; use File::Spec;";
         $tmpfile = ((!$@) ? File::Spec->tmpdir() : '/tmp').'/ddclient_';
         my @chars = ("A".."Z", "a".."z", "0".."9");
         $tmpfile .= $chars[rand @chars] for 1..10;
-        open($tmpfile, '>', $tmpfile) or fatal("Falied to open $tmpfile for curl");
+        open($tfh, '>', $tmpfile) or fatal("Falied to open $tmpfile for curl");
     }
     chmod(0600,$tmpfile);
     debug("CURL Tempfile: %s",$tmpfile);
     local $\ = "\n";  ## Terminate the file,
     local $, = "\n";  ## and each parameter, with a newline.
-    print($tmpfile @params);
-    close($tmpfile);
+    print($tfh @params);
+    close($tfh);
 
     ## Make sure to delete temp file on Ctrl-C or SIGTERM
     local $SIG{'HUP'} = sub { unlink($tmpfile); $caught_hup = 1; exit 1 if !$daemon; };
