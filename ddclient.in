@@ -2160,7 +2160,7 @@ sub fetch_via_socket_io {
 }
 
 ######################################################################
-## geturl -- via curl
+## curl_cmd() function to execute system curl command
 ######################################################################
 sub curl_cmd {
     my @params = @_;
@@ -2223,6 +2223,26 @@ sub curl_cmd {
     return $reply;
 }
 
+######################################################################
+## escape_curl_param() makes sure any special characters within a
+## curl parameter is properly escaped.
+######################################################################
+sub escape_curl_param {
+    my $str = shift // '';
+
+    return '' if ($str eq '');
+    $str =~ s/"/\\"/g;  ## Escape double-quotes
+    $str =~ s/\\/\\\\/g;## Escape backslashes
+    $str =~ s/\n/\\n/g; ## Escape newline
+    $str =~ s/\r/\\r/g; ## Escape carrage return
+    $str =~ s/\t/\\t/g; ## Escape tabs
+    $str =~ s/\v/\\v/g; ## Escape vertical whitespace
+    return $str;
+}
+
+######################################################################
+## fetch_via_curl() is used for geturl() when global curl option set
+######################################################################
 sub fetch_via_curl {
     my ($params) = @_;
     my $proxy = $params->{proxy};
@@ -2271,22 +2291,21 @@ sub fetch_via_curl {
     } else {
         push(@curlopt, "silent");
         push(@curlopt, "insecure") if ($use_ssl && !($params->{ssl_validate} // 1));
-        push(@curlopt, "cacert=".opt('ssl_ca_file')) if defined(opt('ssl_ca_file'));
-        push(@curlopt, "capath=".opt('ssl_ca_dir')) if defined(opt('ssl_ca_dir'));
+        push(@curlopt, "cacert=\"".escape_curl_param(opt('ssl_ca_file')).'"') if defined(opt('ssl_ca_file'));
+        push(@curlopt, "capath=\"".escape_curl_param(opt('ssl_ca_dir')).'"') if defined(opt('ssl_ca_dir'));
         push(@curlopt, "ipv4") if ($ipversion eq '4');
         push(@curlopt, "ipv6") if ($ipversion eq '6');
-        push(@curlopt, "user-agent=\"${program}/${version}\"");
+        push(@curlopt, "user-agent=\"".escape_curl_param("${program}/${version}").'"');
         push(@curlopt, "connect-timeout=$timeout");
         push(@curlopt, "max-time=$timeout");
         push(@curlopt, "request=$method");
-        push(@curlopt, "user=${login}:${password}") if (defined($login) && defined($password));
-        push(@curlopt, "proxy=\"${protocol}://${proxy}\"") if defined($proxy);
-        push(@curlopt, "url=\"${protocol}://${server}/${url}\"");
+        push(@curlopt, "user=\"".escape_curl_param("${login}:${password}").'"') if (defined($login) && defined($password));
+        push(@curlopt, "proxy=\"".escape_curl_param("${protocol}://${proxy}").'"') if defined($proxy);
+        push(@curlopt, "url=\"".escape_curl_param("${protocol}://${server}/${url}").'"');
         @header_lines = split('\n', $headers);
-        foreach (@header_lines) { s/"/\\"/g; $_ = "header=\"$_\"" };
+        $_ = "header=\"".escape_curl_param($_).'"' foreach (@header_lines);
         push(@curlopt, @header_lines);
-        $data =~ s/"/\\"/g;  ## Escape double-quotes
-        push(@curlopt, "data=\"${data}\"") if ($data ne '');
+        push(@curlopt, "data=\"".escape_curl_param(${data}).'"') if ($data ne '');
 
         # don't include ${url} as that might expose login credentials
         $0 = sprintf("%s - curl sending to %s", $program, "${protocol}://${server}");
