@@ -2280,6 +2280,24 @@ sub get_ip {
 my $regex_ipv4 = qr/(?:(?<octet>25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?&octet)/;
 
 ######################################################################
+## is_ipv4() validates if string is valid IPv4 address with no preceding
+## or trailing spaces/characters, not even line breaks.
+######################################################################
+sub is_ipv4 {
+    return (shift // '') =~ /\A$regex_ipv4\z/;
+}
+
+######################################################################
+## extract_ipv4() finds the first valid IPv4 address in the given string,
+## removes embedded leading zeros, and returns the result.
+######################################################################
+sub extract_ipv4 {
+    (shift // '') =~ /(?:\b|_)($regex_ipv4)(?:\b|_)/ or return undef;
+    (my $ip = $1) =~ s/\b0+\B//g; ## remove embedded leading zeros
+    return $ip;
+}
+
+######################################################################
 ## Regex that matches an IPv6 address. Accepts embedded leading zeros.
 ## Accepts IPv4-mapped IPv6 addresses such as 64:ff9b::192.0.2.13.
 ######################################################################
@@ -2327,24 +2345,6 @@ my $regex_ipv6 = qr/
     )
     (?!(?&x))  # Not followed by a character that is not allowed to come after the address
 /xi;
-
-######################################################################
-## is_ipv4() validates if string is valid IPv4 address with no preceding
-## or trailing spaces/characters, not even line breaks.
-######################################################################
-sub is_ipv4 {
-    return (shift // '') =~ /\A$regex_ipv4\z/;
-}
-
-######################################################################
-## extract_ipv4() finds the first valid IPv4 address in the given string,
-## removes embedded leading zeros, and returns the result.
-######################################################################
-sub extract_ipv4 {
-    (shift // '') =~ /(?:\b|_)($regex_ipv4)(?:\b|_)/ or return undef;
-    (my $ip = $1) =~ s/\b0+\B//g; ## remove embedded leading zeros
-    return $ip;
-}
 
 ######################################################################
 ## is_ipv6() validates if string is valid IPv6 address with no preceding
