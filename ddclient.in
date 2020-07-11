@@ -2188,22 +2188,12 @@ sub curl_cmd {
 
     # debug("CURL: %s\r\n",join("\r\n      ",@params)); ## Uncomment only if required as may expose credentials
 
-    eval "no warnings 'all'; use File::Temp;";
-    if (!$@) {
-        ## Use system File::Temp to generate filename...
-        $tfh = File::Temp->new( TMPDIR => 1,  ## in system temp dir
-                                UNLINK => 0,  ## we will delete it ourselves
-                                TEMPLATE => 'ddclient_XXXXXXXXXX');
-        $tmpfile = $tfh->filename;
-    } else {
-        ## System does not have File::Temp so generate ourselves...
-        eval "no warnings 'all'; use File::Spec;";
-        $tmpfile = ((!$@) ? File::Spec->tmpdir() : '/tmp').'/ddclient_';
-        $tmpfile = quotemeta($tmpfile);
-        my @chars = ("A".."Z", "a".."z", "0".."9");
-        $tmpfile .= $chars[rand @chars] for 1..10;
-        open($tfh, '>', $tmpfile) or fatal("Falied to open $tmpfile for curl");
-    }
+    ## Use system File::Temp to generate filename...
+    $tfh = File::Temp->new( TMPDIR => 1,  ## in system temp dir
+                            UNLINK => 0,  ## we will delete it ourselves
+                            TEMPLATE => 'ddclient_XXXXXXXXXX');
+    $tmpfile = $tfh->filename;
+
     chmod(0600,$tmpfile);
     debug("CURL Tempfile: %s",$tmpfile);
     local $\ = "\n";  ## Terminate the file,
