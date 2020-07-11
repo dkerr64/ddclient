@@ -2396,80 +2396,62 @@ sub extract_ipv6 {
 }
 
 ######################################################################
-## Regex to find IPv6 GUA in standard, compressed format. Accepts
-## embedded leading zeros in the address. Adapted from regex in the
-## Regular Expressions Cookbook by J.Goyvaerets and S.Levithan
-######################################################################
-my $regex_ipv6_only_gua = qr/
-    $regex_ipv6_elements      # include the named groups we need
-    (?<!(?&x))  # Not preceded by a character that is not allowed to come before the address
-    (?:
-      [23][A-F0-9]{3}:        # Uncompressed starts with 2xxx: or 3xxx:
-      (?&g_){6}               #   followed by exactly 6 groups of 1-4 hex chars
-      (?:(?&g)                #   and a group
-        | :                   #   or a single colon
-      )
-      |                       # OR compressed form...
-        (?=                   #   Only consider this case if the string...
-          [23][A-F0-9]{3}:    #   ...starts with 2xxx: or 3xxx:
-          (?&g0_){0,6}(?&g0)  #   and has 1 to 7 possibly empty groups...
-          (?!(?&x))           #   ...then ends.
-        )
-        (?:                   #   If condition true then...
-          (?&g_){1,7}         #     between 1 and 7 non-empty groups
-          | :                 #     or a single colon
-        )
-        (?:                   #   Followed by...
-          (?&_g){1,7}         #     between 1 and 7 groups that start with a colon
-          | :                 #     or a single colon
-        )
-    )
-    (?!(?&x))  # Not followed by a character that is not allowed to come after the address
-/xi;
-
-######################################################################
-## Mixed format IPv6 GUA have a IPv6 GUA prefix followed by a IPv4 address
-######################################################################
-my $regex_ipv6_mixed_gua = qr/
-    $regex_ipv6_elements      # include the named groups we need
-    (?<!(?&x))  # Not preceded by a character that is not allowed to come before the address
-    (?:                       # Match the IPv6 prefix
-      [23][A-F0-9]{3}:        # Uncompressed and starts with 2xxx: or 3xxx:
-      (?&g_){5}               #   then 5 groups of 1-4 hex chars with colons
-      |                       # OR compressed form...
-        (?=                   #   Only consider this case if the string...
-          [23][A-F0-9]{3}:    #   starts with 2xxx: or 3xxx:
-          (?&g0_){0,5}        #   then has between 0 and 5 possibly empty groups,
-          (?&ip4)             #   followed by a IPv4 address...
-          (?!(?&x))           #   ...then ends.
-        )
-        (?:                   #   If condition true then...
-          (?&g_){1,5}         #     Between 1 and 5 groups ending with a colon
-          | :                 #     or a single colon
-        )
-        (?:                   #   Followed by...
-          (?&_g){1,5}:        #     Between 1 and 5 groups that start with a colon, then ends with one
-          | :                 #     or a single colon
-        )
-    )
-    (?&ip4)                   # Prefix is followed by an IPv4 address
-    (?!(?&x))  # Not followed by a character that is not allowed to come after the address
-/xi;
-
-######################################################################
-## So now we can put it all together to find any format IPv6
+## Regex that matches an IPv6 GUA address. Accepts embedded leading zeros.
+## Accepts IPv4-mapped IPv6 addresses such as 2001:ff9b::192.0.2.13.
 ######################################################################
 my $regex_ipv6_gua = qr/
-      $regex_ipv6_mixed_gua  ## Is it a mixed IPv6:v4 GUA address
-    | $regex_ipv6_only_gua   ## or a standad or compressed IPv6 GUA address
+    # Define some named groups so we can use Perl's recursive subpattern feature for shorthand:
+    (?<g>[0-9A-F]{1,4}){0}  # "g" matches a group of 1 to 4 hex chars
+    (?<g_>(?&g):){0}        # "g_" matches a group of 1 to 4 hex chars followed by a colon
+    (?<_g>:(?&g)){0}        # "_g" matches a colon followed by a group of 1 to 4 hex chars
+    (?<g0>(?&g)?){0}        # "g0" is an optional "g" (matches a group of 0 to 4 hex chars)
+    (?<g0_>(?&g0):){0}      # "g0_" is an optional "g" followed by a colon
+    (?<x>[:.0-9A-Z]){0}     # "x" matches chars that should never come before or after the address
+    (?<ip4>$regex_ipv4){0}  # "ip4" matches an IPv4 address x.x.x.x
+
+    # Now for the regex itself:
+    (?<!(?&x))  # Not preceded by a character that is not allowed to come before the address
+    (?:
+      [23][A-F0-9]{3}:   # Uncompressed starts with 2xxx: or 3xxx:
+      (?&g_){6}(?&g)     #   and exactly 7 groups of 1-4 hex chars
+      | [23][A-F0-9]{3}: # OR compressed starting with 2xxx: or 3xxx:
+        (?&g_){0,6}:     #   with the double colon at the end
+      |                  # OR compressed form with the double colon in the middle:
+        (?=                   # Only consider this case if the string...
+          [23][A-F0-9]{3}:    # ...starts with 2xxx: or 3xxx:
+          (?&g0_){1,6}(?&g0)  # ...and 2 to 7 possibly empty groups
+          (?!(?&x))           # ...then ends.
+        )                     # If the condition is true, then:
+        (?&g_){1,6}           #   1 to 6 non-empty groups before the double colon
+        (?&_g){1,6}           #   1 to 6 non-empty groups after the double colon
+      |                  # OR an IPv4-mapped IPv6 address:
+        (?:                # It starts with a 96-bit prefix represented by:
+          [23][A-F0-9]{3}:   # Uncompressed and starts with 2xxx: or 3xxx:
+          (?&g_){5}          #   and exactly 5 groups of 1-4 hex chars with their colons
+          | [23][A-F0-9]{3}: # OR compressed starting with 2xxx: or 3xxx:
+            (?&g_){0,4}:     #   with the double colon at the end
+          |                  # OR compressed form with the double colon in the middle:
+            (?=                 # Only consider this case if the prefix...
+              [23][A-F0-9]{3}:  # ...starts with 2xxx: or 3xxx:
+              (?&g0_){2,5}      # ...and 2 to 5 possibly empty groups...
+              (?&ip4)(?!(?&x))  # ...follwed by the IPv4 and then ends.
+            )                   # If the condition is true, then:
+            (?&g_){1,4}         #   1 to 4 non-empty groups before the double colon
+            (?&_g){1,4}         #   1 to 4 non-empty groups after the double colon
+            :                   #   colon separating the IPv6 part from the IPv4 part
+        )
+        (?&ip4)            # Prefix is followed by an IPv4 address
+    )
+    (?!(?&x))  # Not followed by a character that is not allowed to come after the address
 /xi;
+
 
 ######################################################################
 ## is_ipv6_gua() validates if string is valid IPv6 Global Unicast Address (GUA)
 ## with no preceding or trailing spaces/characters, not even line breaks.
 ######################################################################
 sub is_ipv6_gua {
-    return ((shift // '') =~ /\A($regex_ipv6_gua)\z/) ne '';
+    return (shift // '') =~ /\A($regex_ipv6_gua)\z/
 }
 
 ######################################################################
