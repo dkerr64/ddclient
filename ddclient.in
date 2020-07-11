@@ -2199,6 +2199,7 @@ sub curl_cmd {
         ## System does not have File::Temp so generate ourselves...
         eval "no warnings 'all'; use File::Spec;";
         $tmpfile = ((!$@) ? File::Spec->tmpdir() : '/tmp').'/ddclient_';
+        $tmpfile = quotemeta($tmpfile);
         my @chars = ("A".."Z", "a".."z", "0".."9");
         $tmpfile .= $chars[rand @chars] for 1..10;
         open($tfh, '>', $tmpfile) or fatal("Falied to open $tmpfile for curl");
