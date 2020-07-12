@@ -2389,253 +2389,6 @@ sub fetch_via_socket_io {
 }
 
 ######################################################################
-## Regex to find IPv4 address. Accepts embedded leading zeros.
-######################################################################
-my $regex_ipv4 = qr/(?:(?<octet>25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?&octet)/;
-
-######################################################################
-## Regex to find IPv6 in standard, compressed format. Accepts
-## embedded leading zeros in the address. Adapted from regex in the
-## Regular Expressions Cookbook by J.Goyvaerets and S.Levithan
-######################################################################
-my $regex_ipv6_only = qr/(?<![:.0-9A-Z])        ## Negative lookbehind for word boundry
-    (?:[0-9A-F]{1,4}:){7}[0-9A-F]{1,4}          ## Is in standard format
-      |(?=(?:[0-9A-F]{0,4}:){0,7}[0-9A-F]{0,4}  ## OR compressed with at most 7 colons
-       (?![:.0-9A-Z]))                          ##   and negative lookahead for boundry
-       (?:(?:[0-9A-F]{1,4}:){1,7}|:)(?:(?::[0-9A-F]{1,4}){1,7}|:)  ## and only 1 double-colon
-      |(?:[0-9A-F]{1,4}:){7}:                   ## OR compressed with 8 colons (double at end)
-      |:(?::[0-9A-F]{1,4}){7}                   ## OR compressed with 8 colons (double at front)
-    (?![:.0-9A-Z])/xi;                          ## Negative lookahead for boundry
-
-######################################################################
-## Mixed format IPv6 have a IPv6 prefix followed by a IPv4 address
-## This regex finds the prefix.
-######################################################################
-my $regex_ipv4_prefix = qr/(?<![:.0-9A-Z])      ## Negative lookbehind for word boundry
-     (?:[A-F0-9]{1,4}:){6}                      ## Standard non-compressed format
-    |(?=(?:[A-F0-9]{0,4}:){0,6}                 ## OR compressed with at most 6 colons
-     (?:[0-9]{1,3}\.){3}[0-9]{1,3}              ##   and 4 bytes
-     (?![:.0-9A-Z]))                            ##   and negative lookahead for boundry
-     (?:(?:[0-9A-F]{1,4}:){1,5}|:)(?:(?::[0-9A-F]{1,4}){1,5}:|:)  ## and only 1 double-colon
-    |::(?:[A-F0-9]{1,4}:){5}/xi;                ## OR compressed with 7 colons and 5 numbers
-
-######################################################################
-## So now we can put it all together to find any format IPv6
-######################################################################
-my $regex_ipv6 = qr/
-     (?:$regex_ipv4_prefix)(?:$regex_ipv4)      ## Is it a mixed IPv6:v4 address
-    |(?:$regex_ipv6_only)/xi;                   ## or a standad or compressed IPv6 address
-
-######################################################################
-## is_ipv4() validates if string is valid IPv4 address with no preceding
-## or trailing spaces/characters, not even line breaks.
-######################################################################
-sub is_ipv4 {
-    return ((shift // '') =~ /\A($regex_ipv4)\z/) ne '';
-}
-
-######################################################################
-## extract_ipv4() finds the first valid IPv4 address in the given string,
-## removes embedded leading zeros, and returns the result.
-######################################################################
-sub extract_ipv4 {
-    (shift // '') =~ /(?:\b|_)($regex_ipv4)(?:\b|_)/ or return undef;
-    (my $ip = $1) =~ s/\b0+\B//g; ## remove embedded leading zeros
-    return $ip;
-}
-
-######################################################################
-## is_ipv6() validates if string is valid IPv6 address with no preceding
-## or trailing spaces/characters, not even line breaks.
-######################################################################
-sub is_ipv6 {
-    return ((shift // '') =~ /\A($regex_ipv6)\z/) ne '';
-}
-
-######################################################################
-## extract_ipv6() finds the first valid IPv6 address in the given string,
-## removes embedded leading zeros, and returns the result.
-######################################################################
-sub extract_ipv6 {
-    (shift // '') =~ /($regex_ipv6)/ or return undef;
-    (my $ip = $1) =~ s/\b0+\B//g; ## remove embedded leading zeros
-    return $ip;
-}
-
-######################################################################
-## Regex to find IPv6 GUA in standard, compressed format. Accepts
-## embedded leading zeros in the address. Adapted from regex in the
-## Regular Expressions Cookbook by J.Goyvaerets and S.Levithan
-######################################################################
-my $regex_ipv6_only_gua = qr/(?<![:.0-9A-Z]])   ## Negative lookbehind for word boundry
-     [23][A-F0-9]{3}:                           ## Starts with 2xxx: or 3xxx:
-     (?:[0-9A-F]{1,4}:){6}[0-9A-F]{1,4}         ##   in standard format
-    |(?=[23][A-F0-9]{3}:                        ## OR starts with 2xxx: or 3xxx:
-     (?:[0-9A-F]{0,4}:){0,6}[0-9A-F]{0,4}       ##   in compressed with at most 7 colons
-     (?![:.0-9A-Z]]))                           ##   and negative lookahead for boundry
-     (?:(?:[0-9A-F]{1,4}:){1,7}|:)(?:(?::[0-9A-F]{1,4}){1,7}|:)  ## and only 1 double-colon
-    |[23][A-F0-9]{3}:                           ## OR starts with 2xxx: or 3xxx:
-     (?:[0-9A-F]{1,4}:){6}:                     ##    compressed with 8 colons (double at end)
-    (?![:.0-9A-Z]])/xi;                         ## Negative lookahead for boundry
-
-######################################################################
-## Mixed format IPv6 GUA have a IPv6 GUA prefix followed by a IPv4 address
-## This regex finds the prefix.
-######################################################################
-my $regex_ipv4_prefix_gua = qr/(?<![:.0-9A-Z])  ## Negative lookbehind for word boundry
-     [23][A-F0-9]{3}:                           ## Starts with 2xxx: or 3xxx:
-     (?:[A-F0-9]{1,4}:){5}                      ##   in standard non-compressed format
-    |(?=[23][A-F0-9]{3}:                        ## OR starts with 2xxx: or 3xxx:
-     (?:[A-F0-9]{0,4}:){0,5}                    ##   in compressed with at most 5 colons
-     (?:[0-9]{1,3}\.){3}[0-9]{1,3}              ##   and 4 bytes
-     (?![:.0-9A-Z]))                            ##   and negative lookahead for boundry
-     (?:(?:[0-9A-F]{1,4}:){1,5}|:)(?:(?::[0-9A-F]{1,4}){1,5}:|:)  ## and only 1 double-colon
-    |[23][A-F0-9]{3}:                           ## OR starts with 2xxx: or 3xxx:
-     (?:[A-F0-9]{1,4}:){4}/xi;                  ##    compressed with 6 colons and 5 numbers
-
-######################################################################
-## So now we can put it all together to find any format IPv6
-######################################################################
-my $regex_ipv6_gua = qr/
-     (?:$regex_ipv4_prefix_gua)(?:$regex_ipv4)  ## Is it a mixed IPv6:v4 GUA address
-    |(?:$regex_ipv6_only_gua)/xi;               ## or a standad or compressed IPv6 GUA address
-
-######################################################################
-## is_ipv6_gua() validates if string is valid IPv6 Global Unicast Address (GUA)
-## with no preceding or trailing spaces/characters, not even line breaks.
-######################################################################
-sub is_ipv6_gua {
-    return ((shift // '') =~ /\A($regex_ipv6_gua)\z/) ne '';
-}
-
-######################################################################
-## extract_ipv6_gua() finds the first valid IPv6 GUA address in the given
-## string, removes embedded leading zeros, and returns the result.
-######################################################################
-sub extract_ipv6_gua {
-    (shift // '') =~ /($regex_ipv6_gua)/ or return undef;
-    (my $ip = $1) =~ s/\b0+\B//g; ## remove embedded leading zeros
-    return $ip;
-}
-
-######################################################################
-## get_default_if finds the default network interface based on the
-## IP routing table on the system, and the default route.
-######################################################################
-sub get_default_if {
-    my $ipver = shift //4;
-    my $ipstr = ($ipver == 6)?'6':'';
-    my $reply = '';
-    my $count = 0;
-
-    return undef if (($ipver != 4) && ($ipver != 6));
-
-    ## Best option is the ip command from iproute2 package
-    $reply = qx{ ip -$ipver -o route list match default 2>/dev/null };
-    if (!$?) {
-        debug2("Raw 'ip route list match default' information for IPv%s:\n%s",$ipver,$reply);
-        ## There should be no ambiguity using iproute2...
-        return ($reply =~ /(?<=\bdev\W)(\w+)/)[0];
-    }
-
-    ## Fallback is the netstat command.  This is only option on MacOS
-    $reply = qx{ netstat -rn -$ipver 2>/dev/null };             #Linux
-    $reply = qx{ netstat -rn -f inet$ipstr 2>/dev/null } if $?; #MacOS
-    $reply = qx{ netstat -rn 2>/dev/null } if $?; #Busybox (IPv4 only)
-    debug2("Raw 'netstat -rn' route information for IPv%s:\n%s",$ipver,$reply);
-    my @list = split(/\n/, $reply);
-    @list = grep(!/\blo\b/, @list);    ## Filter out loopback interface
-    @list = ($ipver == 4) ? grep(/^(?:default|(?:(?:0\.){3}0))/, @list)
-                          : grep(/^default|::\/0/, @list);
-    return undef if (($count = scalar(@list)) == 0);
-    ## interface will be the last word in the line.
-    return ($list[0] =~ /\b(\w+)\s*$/)[0] if ($count == 1);
-    ## if we have more than one default route we're going to select the first
-    ## in the list as that is most likely the route that the OS will select.
-    debug("Multiple default routes found for IPv%s using first in list:\n%s",$ipver,$list[0]);
-    return ($list[0] =~ /\b(\w+)\s*$/)[0];
-}
-
-######################################################################
-## get_ip_from_interface() finds an IPv4 or IPv6 address from a
-## network interface. Defaults to IPv4 unless '6' passed as 2nd parameter.
-######################################################################
-sub get_ip_from_interface {
-    my $if = shift;
-    my $ipver = shift // 4;   ## Defaults to IPv6 if not specified
-    my $reply = shift // '';  ## Pass in data for unit testing purposes only
-    my $MacOS = shift // 0;   ## For testing can set to 1 if input data is MacOS format
-    my $count = 0;
-
-    if (($ipver != 4) && ($ipver != 6)) {
-        warning("get_ip_from_interface() invalid IP version: %s",$ipver);
-        return undef;
-    }
-
-    $if = get_default_if($ipver) if (lc($if) eq "default");
-    return undef if !defined($if);
-
-    if ($ipver == 4) {
-        if ($reply eq '') { ## skip if test data passed in.
-            ## Try ip first, then ifconfig.
-            $reply = qx{ip -4 -o addr show dev $if scope global 2>/dev/null};
-            $reply = qx{ifconfig >/dev/null && ifconfig $if 2>/dev/null | grep -w "inet"} if $?;
-        }
-        failed("Unable to obtain information for '%s' -- missing ip or ifconfig commands?",$if) if $?;
-        ## IPv4 is simple, we just need to find the first IPv4 address returned in the list.
-        debug2("Raw IPv4 address information for %s:\r\n%s",$if,$reply);
-        return extract_ipv4($reply);
-    }
-
-    ## From this point on we only looking for IPv6 address.
-    ## This is much more complex than IPv4
-    if ($reply eq '') { ## skip if test data passed in.
-        ## Try ip first, then ifconfig with -L for MacOS then finally ifconfig for everything else
-        $reply = qx{ip -6 -o addr show dev $if scope global 2>/dev/null};
-      (($reply = qx{ifconfig -L $if 2>/dev/null}) && ($MacOS = 1)) if $?;
-        $reply = qx{ifconfig $if 2>/dev/null} if $?;
-    }
-    failed("Unable to obtain information for '%s' -- missing ip or ifconfig commands?",$if) if $?;
-    debug("Detected we're probably running on MacOS") if ($MacOS == 1);
-
-    my @reply = split(/\n/, $reply);
-    @reply = grep(/\binet6\b/, @reply);
-    debug2("Raw IPv6 address information for %s: (%s)\r\n%s",$if,scalar(@reply),join("\n",@reply));
-    @reply = grep(!/\bdeprecated\b|\btemporary\b/, @reply);  ## remove depreciated or temporary addresses
-    debug2("After removing deprecated and temporary addresses %s: (%s)\r\n%s",$if,scalar(@reply),join("\n",@reply));
-    @reply = grep(/$regex_ipv6_gua/, @reply); ## We only accept IPv6 Global Unicast Addresses (GUA) so filter on those.
-    debug2("After filtering for GUA addresses %s: (%s)\r\n%s",$if,scalar(@reply),join("\n",@reply));
-
-    return undef if (($count = scalar(@reply)) == 0); ## If there are none return undef
-    return extract_ipv6($reply[0]) if ($count == 1);  ## If there is only one then we're done
-
-    ## If there are more than one we need to select the "best". First choice would be a static address.
-    my @static = ($MacOS == 1) ? grep(!/^.*\bvltime\b.*$/i, @reply)
-                               : grep(/^.*\bvalid_lft.\bforever\b.*$/i, @reply);
-    $count = scalar(@static);
-    debug2("Possible Static IP addresses %s: (%s)\r\n%s",$if,$count,join("\n",@static));
-
-    return extract_ipv6($static[0]) if ($count == 1); ## If there is only one then we're done
-    @reply = @static if ($count > 1);  ## If more than one we'll sort through the statics.
-
-    ## Sort what we have by the prefix length, IP address "length" and finally valid life.
-    my @sorted = sort {
-        ## We give preference to IP addressess with the longest prefix...
-        (($b =~ /(?:\bprefixlen\b\s*|\/)(\d+)/i)[0] // 0) <=> (($a =~ /(?:\bprefixlen\b\s*|\/)(\d+)/i)[0] // 0)
-        ## if there are multiple the same then we prefer "shorter" IP addresses in the
-        ## theory that a shorter address is more likely assigned by DHCPv6 than SLAAC.
-        ## E.g. 2001:db8:4341:0781::8214/64 is preferable to 2001:DB8:4341:0781:34a6:c329:c52e:8ba6/64
-     || (()= (extract_ipv6($a) // '') =~ /[0-9A-F]+/gi) <=> (()= (extract_ipv6($b) // '') =~ /[0-9A-F]+/gi)
-        ## Finally we sort by remaining valid lifetime which only works with iproute2 or MacOS
-     || (($b =~ /(?:\bvalid_lft\b\s*|\bvltime\b\s*)(\d+)/i)[0] // 0) <=> (($a =~ /(?:\bvalid_lft\b\s*|\bvltime\b\s*)(\d+)/i)[0] // 0)
-    } @reply;
-    debug2("Sorted list of IP addresss for %s: (%s)\r\n%s",$if,scalar(@sorted),join("\n",@sorted));
-
-    ## Whatever sorted to the top is the "best" choice for IPv6 address
-    return extract_ipv6_gua($sorted[0]);
-}
-
-######################################################################
 ## curl_cmd() function to execute system curl command
 ######################################################################
 sub curl_cmd {
@@ -2931,6 +2684,123 @@ sub get_ip {
 
     debug("get_ip: using %s, %s reports %s", $use, $arg, $ip // "<undefined>");
     return $ip;
+}
+
+######################################################################
+## get_default_if finds the default network interface based on the
+## IP routing table on the system, and the default route.
+######################################################################
+sub get_default_if {
+    my $ipver = shift //4;
+    my $ipstr = ($ipver == 6)?'6':'';
+    my $reply = '';
+    my $count = 0;
+
+    return undef if (($ipver != 4) && ($ipver != 6));
+
+    ## Best option is the ip command from iproute2 package
+    $reply = qx{ ip -$ipver -o route list match default 2>/dev/null };
+    if (!$?) {
+        debug2("Raw 'ip route list match default' information for IPv%s:\n%s",$ipver,$reply);
+        ## There should be no ambiguity using iproute2...
+        return ($reply =~ /(?<=\bdev\W)(\w+)/)[0];
+    }
+
+    ## Fallback is the netstat command.  This is only option on MacOS
+    $reply = qx{ netstat -rn -$ipver 2>/dev/null };             #Linux
+    $reply = qx{ netstat -rn -f inet$ipstr 2>/dev/null } if $?; #MacOS
+    $reply = qx{ netstat -rn 2>/dev/null } if $?; #Busybox (IPv4 only)
+    debug2("Raw 'netstat -rn' route information for IPv%s:\n%s",$ipver,$reply);
+    my @list = split(/\n/, $reply);
+    @list = grep(!/\blo\b/, @list);    ## Filter out loopback interface
+    @list = ($ipver == 4) ? grep(/^(?:default|(?:(?:0\.){3}0))/, @list)
+                          : grep(/^default|::\/0/, @list);
+    return undef if (($count = scalar(@list)) == 0);
+    ## interface will be the last word in the line.
+    return ($list[0] =~ /\b(\w+)\s*$/)[0] if ($count == 1);
+    ## if we have more than one default route we're going to select the first
+    ## in the list as that is most likely the route that the OS will select.
+    debug("Multiple default routes found for IPv%s using first in list:\n%s",$ipver,$list[0]);
+    return ($list[0] =~ /\b(\w+)\s*$/)[0];
+}
+
+######################################################################
+## get_ip_from_interface() finds an IPv4 or IPv6 address from a
+## network interface. Defaults to IPv4 unless '6' passed as 2nd parameter.
+######################################################################
+sub get_ip_from_interface {
+    my $if = shift;
+    my $ipver = shift // 4;   ## Defaults to IPv6 if not specified
+    my $reply = shift // '';  ## Pass in data for unit testing purposes only
+    my $MacOS = shift // 0;   ## For testing can set to 1 if input data is MacOS format
+    my $count = 0;
+
+    if (($ipver != 4) && ($ipver != 6)) {
+        warning("get_ip_from_interface() invalid IP version: %s",$ipver);
+        return undef;
+    }
+
+    $if = get_default_if($ipver) if (lc($if) eq "default");
+    return undef if !defined($if);
+
+    if ($ipver == 4) {
+        if ($reply eq '') { ## skip if test data passed in.
+            ## Try ip first, then ifconfig.
+            $reply = qx{ip -4 -o addr show dev $if scope global 2>/dev/null};
+            $reply = qx{ifconfig >/dev/null && ifconfig $if 2>/dev/null | grep -w "inet"} if $?;
+        }
+        failed("Unable to obtain information for '%s' -- missing ip or ifconfig commands?",$if) if $?;
+        ## IPv4 is simple, we just need to find the first IPv4 address returned in the list.
+        debug2("Raw IPv4 address information for %s:\r\n%s",$if,$reply);
+        return extract_ipv4($reply);
+    }
+
+    ## From this point on we only looking for IPv6 address.
+    ## This is much more complex than IPv4
+    if ($reply eq '') { ## skip if test data passed in.
+        ## Try ip first, then ifconfig with -L for MacOS then finally ifconfig for everything else
+        $reply = qx{ip -6 -o addr show dev $if scope global 2>/dev/null};
+      (($reply = qx{ifconfig -L $if 2>/dev/null}) && ($MacOS = 1)) if $?;
+        $reply = qx{ifconfig $if 2>/dev/null} if $?;
+    }
+    failed("Unable to obtain information for '%s' -- missing ip or ifconfig commands?",$if) if $?;
+    debug("Detected we're probably running on MacOS") if ($MacOS == 1);
+
+    my @reply = split(/\n/, $reply);
+    @reply = grep(/\binet6\b/, @reply);
+    debug2("Raw IPv6 address information for %s: (%s)\r\n%s",$if,scalar(@reply),join("\n",@reply));
+    @reply = grep(!/\bdeprecated\b|\btemporary\b/, @reply);  ## remove depreciated or temporary addresses
+    debug2("After removing deprecated and temporary addresses %s: (%s)\r\n%s",$if,scalar(@reply),join("\n",@reply));
+    @reply = grep(/$regex_ipv6_gua/, @reply); ## We only accept IPv6 Global Unicast Addresses (GUA) so filter on those.
+    debug2("After filtering for GUA addresses %s: (%s)\r\n%s",$if,scalar(@reply),join("\n",@reply));
+
+    return undef if (($count = scalar(@reply)) == 0); ## If there are none return undef
+    return extract_ipv6($reply[0]) if ($count == 1);  ## If there is only one then we're done
+
+    ## If there are more than one we need to select the "best". First choice would be a static address.
+    my @static = ($MacOS == 1) ? grep(!/^.*\bvltime\b.*$/i, @reply)
+                               : grep(/^.*\bvalid_lft.\bforever\b.*$/i, @reply);
+    $count = scalar(@static);
+    debug2("Possible Static IP addresses %s: (%s)\r\n%s",$if,$count,join("\n",@static));
+
+    return extract_ipv6($static[0]) if ($count == 1); ## If there is only one then we're done
+    @reply = @static if ($count > 1);  ## If more than one we'll sort through the statics.
+
+    ## Sort what we have by the prefix length, IP address "length" and finally valid life.
+    my @sorted = sort {
+        ## We give preference to IP addressess with the longest prefix...
+        (($b =~ /(?:\bprefixlen\b\s*|\/)(\d+)/i)[0] // 0) <=> (($a =~ /(?:\bprefixlen\b\s*|\/)(\d+)/i)[0] // 0)
+        ## if there are multiple the same then we prefer "shorter" IP addresses in the
+        ## theory that a shorter address is more likely assigned by DHCPv6 than SLAAC.
+        ## E.g. 2001:db8:4341:0781::8214/64 is preferable to 2001:DB8:4341:0781:34a6:c329:c52e:8ba6/64
+     || (()= (extract_ipv6($a) // '') =~ /[0-9A-F]+/gi) <=> (()= (extract_ipv6($b) // '') =~ /[0-9A-F]+/gi)
+        ## Finally we sort by remaining valid lifetime which only works with iproute2 or MacOS
+     || (($b =~ /(?:\bvalid_lft\b\s*|\bvltime\b\s*)(\d+)/i)[0] // 0) <=> (($a =~ /(?:\bvalid_lft\b\s*|\bvltime\b\s*)(\d+)/i)[0] // 0)
+    } @reply;
+    debug2("Sorted list of IP addresss for %s: (%s)\r\n%s",$if,scalar(@sorted),join("\n",@sorted));
+
+    ## Whatever sorted to the top is the "best" choice for IPv6 address
+    return extract_ipv6_gua($sorted[0]);
 }
 
 ######################################################################
