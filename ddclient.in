@@ -3000,7 +3000,8 @@ sub get_ipv4 {
             # when using a URL to find IPv4 address we should force use of IPv4
             $reply = geturl({ proxy => opt('proxy', $h),
                 url => $url,
-                ipversion => 4
+                ipversion => 4,
+                ssl_validate => opt('ssl-validate', $h),
             }) // '';
         }
 
@@ -3028,7 +3029,9 @@ sub get_ipv4 {
             url => $url,
             login => opt('fw-login', $h),
             password => opt('fw-password', $h),
-            ipversion => 4
+            ipversion => 4,
+            ignore_ssl_option => 1,
+            ssl_validate => opt('ssl-validate', $h),
         }) // '';
 
     } elsif ($usev4 eq 'disabled') {
@@ -3051,7 +3054,9 @@ sub get_ipv4 {
                 url => $url,
                 login => opt('fw-login', $h),
                 password => opt('fw-password', $h),
-                ipversion => 4
+                ipversion => 4,
+                ignore_ssl_option => 1,
+                ssl_validate => opt('ssl-validate', $h),
             }) // '';
         }
     }
@@ -3140,7 +3145,8 @@ sub get_ipv6 {
             # when using a URL to find IPv6 address we should force use of IPv6
             $reply = geturl({proxy => opt('proxy'),
                 url => $url,
-                ipversion => 6
+                ipversion => 6,
+                ssl_validate => opt('ssl-validate', $h),
             }) // '';
         }
 
