@@ -2713,7 +2713,7 @@ sub extract_ipv4 {
 ## Regex that matches an IPv6 address. Accepts embedded leading zeros.
 ## Accepts IPv4-mapped IPv6 addresses such as 64:ff9b::192.0.2.13.
 ######################################################################
-my $regex_ipv6_elements = qr/
+my $regex_ipv6 = qr/
     # Define some named groups so we can use Perl's recursive subpattern feature for shorthand:
     (?<g>[0-9A-F]{1,4}){0}  # "g" matches a group of 1 to 4 hex chars
     (?<g_>(?&g):){0}        # "g_" matches a group of 1 to 4 hex chars followed by a colon
@@ -2722,10 +2722,7 @@ my $regex_ipv6_elements = qr/
     (?<g0_>(?&g0):){0}      # "g0_" is an optional "g" followed by a colon
     (?<x>[:.0-9A-Z]){0}     # "x" matches chars that should never come before or after the address
     (?<ip4>$regex_ipv4){0}  # "ip4" matches an IPv4 address x.x.x.x
-/xi;
 
-my $regex_ipv6 = qr/
-    $regex_ipv6_elements    # include the named groups
     # Now for the regex itself:
     (?<!(?&x))  # Not preceded by a character that is not allowed to come before the address
     (?:
@@ -2750,7 +2747,7 @@ my $regex_ipv6 = qr/
           |                  # OR compressed form with the double colon in the middle:
             (?=                 # Only consider this case if the prefix...
               (?&g0_){3,6}      # ...has 3 to 6 possibly empty groups...
-              (?&ip4)(?!(?&x))  # ...follwed by the IPv4 and then ends.
+              (?&ip4)(?!(?&x))  # ...then ends.
             )                   # If the condition is true, then:
             (?&g_){1,4}         #   1 to 4 non-empty groups before the double colon
             (?&_g){1,4}         #   1 to 4 non-empty groups after the double colon
@@ -2784,41 +2781,7 @@ sub extract_ipv6 {
 ## Accepts IPv4-mapped IPv6 addresses such as 2001:ff9b::192.0.2.13.
 ######################################################################
 my $regex_ipv6_gua = qr/
-    $regex_ipv6_elements    # include the named groups
-    # Now for the regex itself:
-    (?<!(?&x))  # Not preceded by a character that is not allowed to come before the address
-    (?:
-      [23][A-F0-9]{3}:   # Uncompressed starts with 2xxx: or 3xxx:
-      (?&g_){6}(?&g)     #   and exactly 7 groups of 1-4 hex chars
-      | [23][A-F0-9]{3}: # OR compressed starting with 2xxx: or 3xxx:
-        (?&g_){0,6}:     #   with the double colon at the end
-      |                  # OR compressed form with the double colon in the middle:
-        (?=                   # Only consider this case if the string...
-          [23][A-F0-9]{3}:    # ...starts with 2xxx: or 3xxx:
-          (?&g0_){1,6}(?&g0)  # ...and 2 to 7 possibly empty groups
-          (?!(?&x))           # ...then ends.
-        )                     # If the condition is true, then:
-        (?&g_){1,6}           #   1 to 6 non-empty groups before the double colon
-        (?&_g){1,6}           #   1 to 6 non-empty groups after the double colon
-      |                  # OR an IPv4-mapped IPv6 address:
-        (?:                # It starts with a 96-bit prefix represented by:
-          [23][A-F0-9]{3}:   # Uncompressed and starts with 2xxx: or 3xxx:
-          (?&g_){5}          #   and exactly 5 groups of 1-4 hex chars with their colons
-          | [23][A-F0-9]{3}: # OR compressed starting with 2xxx: or 3xxx:
-            (?&g_){0,4}:     #   with the double colon at the end
-          |                  # OR compressed form with the double colon in the middle:
-            (?=                 # Only consider this case if the prefix...
-              [23][A-F0-9]{3}:  # ...starts with 2xxx: or 3xxx:
-              (?&g0_){2,5}      # ...and 2 to 5 possibly empty groups...
-              (?&ip4)(?!(?&x))  # ...follwed by the IPv4 and then ends.
-            )                   # If the condition is true, then:
-            (?&g_){1,4}         #   1 to 4 non-empty groups before the double colon
-            (?&_g){1,4}         #   1 to 4 non-empty groups after the double colon
-            :                   #   colon separating the IPv6 part from the IPv4 part
-        )
-        (?&ip4)            # Prefix is followed by an IPv4 address
-    )
-    (?!(?&x))  # Not followed by a character that is not allowed to come after the address
+    (?=[23][A-F0-9]{3}:)$regex_ipv6
 /xi;
 
 ######################################################################
