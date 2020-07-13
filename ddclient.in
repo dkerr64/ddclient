@@ -2301,7 +2301,7 @@ sub extract_ipv4 {
 ## Regex that matches an IPv6 address. Accepts embedded leading zeros.
 ## Accepts IPv4-mapped IPv6 addresses such as 64:ff9b::192.0.2.13.
 ######################################################################
-my $regex_ipv6_elements = qr/
+my $regex_ipv6 = qr/
     # Define some named groups so we can use Perl's recursive subpattern feature for shorthand:
     (?<g>[0-9A-F]{1,4}){0}  # "g" matches a group of 1 to 4 hex chars
     (?<g_>(?&g):){0}        # "g_" matches a group of 1 to 4 hex chars followed by a colon
@@ -2310,10 +2310,7 @@ my $regex_ipv6_elements = qr/
     (?<g0_>(?&g0):){0}      # "g0_" is an optional "g" followed by a colon
     (?<x>[:.0-9A-Z]){0}     # "x" matches chars that should never come before or after the address
     (?<ip4>$regex_ipv4){0}  # "ip4" matches an IPv4 address x.x.x.x
-/xi;
 
-my $regex_ipv6 = qr/
-    $regex_ipv6_elements    # include the named groups
     # Now for the regex itself:
     (?<!(?&x))  # Not preceded by a character that is not allowed to come before the address
     (?:
@@ -2338,7 +2335,7 @@ my $regex_ipv6 = qr/
           |                  # OR compressed form with the double colon in the middle:
             (?=                 # Only consider this case if the prefix...
               (?&g0_){3,6}      # ...has 3 to 6 possibly empty groups...
-              (?&ip4)(?!(?&x))  # ...follwed by the IPv4 and then ends.
+              (?&ip4)(?!(?&x))  # ...then ends.
             )                   # If the condition is true, then:
             (?&g_){1,4}         #   1 to 4 non-empty groups before the double colon
             (?&_g){1,4}         #   1 to 4 non-empty groups after the double colon
@@ -2372,7 +2369,15 @@ sub extract_ipv6 {
 ## Accepts IPv4-mapped IPv6 addresses such as 2001:ff9b::192.0.2.13.
 ######################################################################
 my $regex_ipv6_gua = qr/
-    $regex_ipv6_elements    # include the named groups
+    # Define some named groups so we can use Perl's recursive subpattern feature for shorthand:
+    (?<g>[0-9A-F]{1,4}){0}  # "g" matches a group of 1 to 4 hex chars
+    (?<g_>(?&g):){0}        # "g_" matches a group of 1 to 4 hex chars followed by a colon
+    (?<_g>:(?&g)){0}        # "_g" matches a colon followed by a group of 1 to 4 hex chars
+    (?<g0>(?&g)?){0}        # "g0" is an optional "g" (matches a group of 0 to 4 hex chars)
+    (?<g0_>(?&g0):){0}      # "g0_" is an optional "g" followed by a colon
+    (?<x>[:.0-9A-Z]){0}     # "x" matches chars that should never come before or after the address
+    (?<ip4>$regex_ipv4){0}  # "ip4" matches an IPv4 address x.x.x.x
+
     # Now for the regex itself:
     (?<!(?&x))  # Not preceded by a character that is not allowed to come before the address
     (?:
