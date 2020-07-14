@@ -2162,6 +2162,10 @@ sub fetch_via_socket_io {
     }
 
     $reply =~ s/\r//g if defined $reply;
+
+    # Check that we got a 200 OK back in the HTTP header
+    return '' if (($reply !~ m%^s*HTTP/1.*\s+(\d+)%i) || ("$1" ne "200"));
+    $reply =~ s/^.*?\n\n//s;  # Strip the headers.
     return $reply;
 }
 
@@ -2768,28 +2772,6 @@ sub nic_updateable {
 }
 
 ######################################################################
-## header_ok
-######################################################################
-sub header_ok {
-    my ($host, $line) = @_;
-    my $ok = 0;
-
-    if ($line =~ m%^s*HTTP/1.*\s+(\d+)%i) {
-        my $result = $1;
-
-        if ($result eq '200') {
-            $ok = 1;
-
-        } elsif ($result eq '401') {
-            failed("updating %s: authorization failed (%s)", $host, $line);
-        }
-
-    } else {
-        failed("updating %s: unexpected line (%s)", $host, $line);
-    }
-    return $ok;
-}
-######################################################################
 ## nic_dyndns1_examples
 ######################################################################
 sub nic_dyndns1_examples {
@@ -2855,11 +2837,10 @@ sub nic_dyndns1_update {
             login => $config{$h}{'login'},
             password => $config{$h}{'password'},
         }) // '';
-        if ($reply eq '') {
+        if (!defined($reply) || !$reply) {
             failed("updating %s: Could not connect to %s.", $h, $config{$h}{'server'});
             next;
         }
-        next if !header_ok($h, $reply);
 
         my @reply = split /\n/, $reply;
         my ($title, $return_code, $error_code) = ('', '', '');
@@ -3027,64 +3008,51 @@ sub nic_dyndns2_update {
             failed("updating %s: Could not connect to %s.", $hosts, $config{$h}{'server'});
             next;
         }
-        next if !header_ok($hosts, $reply);
 
         my @reply      = split /\n/, $reply;
-        my $state      = 'header';
         my $returnedip = $ip;
 
         foreach my $line (@reply) {
-            if ($state eq 'header') {
-                $state = 'body';
 
-            } elsif ($state eq 'body') {
-                $state = 'results' if $line eq '';
-
-            } elsif ($state =~ /^results/) {
-                $state = 'results2';
-
-                # bug #10: some dyndns providers does not return the IP so
-                # we can't use the returned IP
-                my ($status, $returnedip) = split / /, lc $line;
-                $ip = $returnedip if (not $ip);
-                my $h = shift @hosts;
+            # bug #10: some dyndns providers does not return the IP so
+            # we can't use the returned IP
+            my ($status, $returnedip) = split / /, lc $line;
+            $ip = $returnedip if (not $ip);
+            my $h = shift @hosts;
 
                 $config{$h}{'status'} = $status;
-                if ($status eq 'good') {
-                    $config{$h}{'ip'}    = $ip;
-                    $config{$h}{'mtime'} = $now;
-                    success("updating %s: %s: IP address set to %s", $h, $status, $ip);
+            if ($status eq 'good') {
+                $config{$h}{'ip'}    = $ip;
+                $config{$h}{'mtime'} = $now;
+                success("updating %s: %s: IP address set to %s", $h, $status, $ip);
 
-                } elsif (exists $errors{$status}) {
-                    if ($status eq 'nochg') {
-                        warning("updating %s: %s: %s", $h, $status, $errors{$status});
-                        $config{$h}{'ip'}     = $ip;
-                        $config{$h}{'mtime'}  = $now;
-                        $config{$h}{'status'} = 'good';
-
-                    } else {
-                        failed("updating %s: %s: %s", $h, $status, $errors{$status});
-                    }
-
-                } elsif ($status =~ /w(\d+)(.)/) {
-                    my ($wait, $units) = ($1, lc $2);
-                    my ($sec,  $scale) = ($wait, 1);
-
-                    ($scale, $units) = (1, 'seconds')   if $units eq 's';
-                    ($scale, $units) = (60, 'minutes')  if $units eq 'm';
-                    ($scale, $units) = (60*60, 'hours') if $units eq 'h';
-
-                    $sec = $wait * $scale;
-                    $config{$h}{'wtime'} = $now + $sec;
-                    warning("updating %s: %s: wait %s %s before further updates", $h, $status, $wait, $units);
+            } elsif (exists $errors{$status}) {
+                if ($status eq 'nochg') {
+                    warning("updating %s: %s: %s", $h, $status, $errors{$status});
+                    $config{$h}{'ip'}     = $ip;
+                    $config{$h}{'mtime'}  = $now;
+                    $config{$h}{'status'} = 'good';
 
                 } else {
-                    failed("updating %s: unexpected status (%s)", $h, $line);
+                    failed("updating %s: %s: %s", $h, $status, $errors{$status});
                 }
+
+            } elsif ($status =~ /w(\d+)(.)/) {
+                my ($wait, $units) = ($1, lc $2);
+                my ($sec,  $scale) = ($wait, 1);
+
+                ($scale, $units) = (1, 'seconds')   if $units eq 's';
+                ($scale, $units) = (60, 'minutes')  if $units eq 'm';
+                ($scale, $units) = (60*60, 'hours') if $units eq 'h';
+
+                $sec = $wait * $scale;
+                $config{$h}{'wtime'} = $now + $sec;
+                warning("updating %s: %s: wait %s %s before further updates", $h, $status, $wait, $units);
+
+            } else {
+                failed("updating %s: unexpected status (%s)", $h, $line);
             }
         }
-        failed("updating %s: Could not connect to %s.", $hosts, $config{$h}{'server'})
-            if $state ne 'results2';
     }
 }
 
@@ -3133,63 +3101,50 @@ sub nic_noip_update {
             login => $config{$h}{'login'},
             password => $config{$h}{'password'},
         }) // '';
-        if ($reply eq '') {
+        if (!defined($reply) || !$reply) {
             failed("updating %s: Could not connect to %s.", $hosts, $config{$h}{'server'});
             next;
         }
-        next if !header_ok($hosts, $reply);
 
         my @reply = split /\n/, $reply;
-        my $state = 'header';
         foreach my $line (@reply) {
-            if ($state eq 'header') {
-                $state = 'body';
 
-            } elsif ($state eq 'body') {
-                $state = 'results' if $line eq '';
+            my ($status, $ip) = split / /, lc $line;
+            my $h = shift @hosts;
 
-            } elsif ($state =~ /^results/) {
-                $state = 'results2';
+            $config{$h}{'status'} = $status;
+            if ($status eq 'good') {
+                $config{$h}{'ip'}     = $ip;
+                $config{$h}{'mtime'}  = $now;
+                success("updating %s: %s: IP address set to %s", $h, $status, $ip);
 
-                my ($status, $ip) = split / /, lc $line;
-                my $h = shift @hosts;
-
-                $config{$h}{'status'} = $status;
-                if ($status eq 'good') {
+            } elsif (exists $errors{$status}) {
+                if ($status eq 'nochg') {
+                    warning("updating %s: %s: %s", $h, $status, $errors{$status});
                     $config{$h}{'ip'}     = $ip;
                     $config{$h}{'mtime'}  = $now;
-                    success("updating %s: %s: IP address set to %s", $h, $status, $ip);
-
-                } elsif (exists $errors{$status}) {
-                    if ($status eq 'nochg') {
-                        warning("updating %s: %s: %s", $h, $status, $errors{$status});
-                        $config{$h}{'ip'}     = $ip;
-                        $config{$h}{'mtime'}  = $now;
-                        $config{$h}{'status'} = 'good';
-
-                    } else {
-                        failed("updating %s: %s: %s", $h, $status, $errors{$status});
-                    }
-
-                } elsif ($status =~ /w(\d+)(.)/) {
-                    my ($wait, $units) = ($1, lc $2);
-                    my ($sec,  $scale) = ($wait, 1);
-
-                    ($scale, $units) = (1, 'seconds')   if $units eq 's';
-                    ($scale, $units) = (60, 'minutes')  if $units eq 'm';
-                    ($scale, $units) = (60*60, 'hours') if $units eq 'h';
-
-                    $sec = $wait * $scale;
-                    $config{$h}{'wtime'} = $now + $sec;
-                    warning("updating %s: %s: wait %s %s before further updates", $h, $status, $wait, $units);
+                    $config{$h}{'status'} = 'good';
 
                 } else {
-                    failed("updating %s: unexpected status (%s)", $h, $line);
+                    failed("updating %s: %s: %s", $h, $status, $errors{$status});
                 }
+
+            } elsif ($status =~ /w(\d+)(.)/) {
+                my ($wait, $units) = ($1, lc $2);
+                my ($sec,  $scale) = ($wait, 1);
+
+                ($scale, $units) = (1, 'seconds')   if $units eq 's';
+                ($scale, $units) = (60, 'minutes')  if $units eq 'm';
+                ($scale, $units) = (60*60, 'hours') if $units eq 'h';
+
+                $sec = $wait * $scale;
+                $config{$h}{'wtime'} = $now + $sec;
+                warning("updating %s: %s: wait %s %s before further updates", $h, $status, $wait, $units);
+
+            } else {
+                failed("updating %s: unexpected status (%s)", $h, $line);
             }
         }
-        failed("updating %s: Could not connect to %s.", $hosts, $config{$h}{'server'})
-            if $state ne 'results2';
     }
 }
 ######################################################################
@@ -3273,7 +3228,7 @@ sub nic_dslreports1_update {
             login => $config{$h}{'login'},
             password => $config{$h}{'password'},
         }) // '';
-        if ($reply eq '') {
+        if (!defined($reply) || !$reply) {
             failed("updating %s: Could not connect to %s.", $h, $config{$h}{'server'});
             next;
         }
@@ -3374,11 +3329,10 @@ sub nic_zoneedit1_update {
             login => $config{$h}{'login'},
             password => $config{$h}{'password'},
         }) // '';
-        if ($reply eq '') {
+        if (!defined($reply) || !$reply) {
             failed("updating %s: Could not connect to %s.", $hosts, $config{$h}{'server'});
             next;
         }
-        next if !header_ok($hosts, $reply);
 
         my @reply = split /\n/, $reply;
         foreach my $line (@reply) {
@@ -3411,8 +3365,6 @@ sub nic_zoneedit1_update {
                 redo if $line;
             }
         }
-        failed("updating %s: no response from %s", $hosts, $config{$h}{'server'})
-            if @hosts;
     }
 }
 ######################################################################
@@ -3529,55 +3481,42 @@ sub nic_easydns_update {
             login => $config{$h}{'login'},
             password => $config{$h}{'password'},
         }) // '';
-        if ($reply eq '') {
+        if (!defined($reply) || !$reply) {
             failed("updating %s: Could not connect to %s.", $hosts, $config{$h}{'server'});
             next;
         }
-        next if !header_ok($hosts, $reply);
 
         my @reply = split /\n/, $reply;
-        my $state = 'header';
         foreach my $line (@reply) {
-            if ($state eq 'header') {
-                $state = 'body';
 
-            } elsif ($state eq 'body') {
-                $state = 'results' if $line eq '';
+            my ($status) = $line =~ /^(\S*)\b.*/;
+            my $h = shift @hosts;
 
-            } elsif ($state =~ /^results/) {
-                $state = 'results2';
+            $config{$h}{'status'} = $status;
+            if ($status eq 'NOERROR') {
+                $config{$h}{'ip'}    = $ip;
+                $config{$h}{'mtime'} = $now;
+                success("updating %s: %s: IP address set to %s", $h, $status, $ip);
 
-                my ($status) = $line =~ /^(\S*)\b.*/;
-                my $h = shift @hosts;
+            } elsif ($status =~ /TOOSOON/) {
+                ## make sure we wait at least a little
+                my ($wait, $units) = (5, 'm');
+                my ($sec,  $scale) = ($wait, 1);
 
-                $config{$h}{'status'} = $status;
-                if ($status eq 'NOERROR') {
-                    $config{$h}{'ip'}    = $ip;
-                    $config{$h}{'mtime'} = $now;
-                    success("updating %s: %s: IP address set to %s", $h, $status, $ip);
+                ($scale, $units) = (1, 'seconds')   if $units eq 's';
+                ($scale, $units) = (60, 'minutes')  if $units eq 'm';
+                ($scale, $units) = (60*60, 'hours') if $units eq 'h';
+                $config{$h}{'wtime'} = $now + $sec;
+                warning("updating %s: %s: wait %d %s before further updates", $h, $status, $wait, $units);
 
-                } elsif ($status =~ /TOOSOON/) {
-                    ## make sure we wait at least a little
-                    my ($wait, $units) = (5, 'm');
-                    my ($sec,  $scale) = ($wait, 1);
+            } elsif (exists $errors{$status}) {
+                failed("updating %s: %s: %s", $h, $line, $errors{$status});
 
-                    ($scale, $units) = (1, 'seconds')   if $units eq 's';
-                    ($scale, $units) = (60, 'minutes')  if $units eq 'm';
-                    ($scale, $units) = (60*60, 'hours') if $units eq 'h';
-                    $config{$h}{'wtime'} = $now + $sec;
-                    warning("updating %s: %s: wait %d %s before further updates", $h, $status, $wait, $units);
-
-                } elsif (exists $errors{$status}) {
-                    failed("updating %s: %s: %s", $h, $line, $errors{$status});
-
-                } else {
-                    failed("updating %s: unexpected status (%s)", $h, $line);
-                }
-                last;
+            } else {
+                failed("updating %s: unexpected status (%s)", $h, $line);
             }
+            last;
         }
-        failed("updating %s: Could not connect to %s.", $hosts, $config{$h}{'server'})
-            if $state ne 'results2';
     }
 }
 ######################################################################
@@ -3647,7 +3586,6 @@ sub nic_namecheap_update {
             failed("updating %s: Could not connect to %s.", $h, $config{$h}{'server'});
             next;
         }
-        next if !header_ok($h, $reply);
 
         my @reply = split /\n/, $reply;
         if (grep /<ErrCount>0/i, @reply) {
@@ -3789,7 +3727,6 @@ sub nic_nfsn_handle_error {
     my $resp = shift;
     my $h    = shift;
 
-    $resp =~ s/^.*?\n\n//s;  # Strip header
     my $json = eval { decode_json($resp) };
     if ($@ || ref($json) ne 'HASH' || not defined $json->{'error'}) {
         failed("Invalid error response: %s", $resp);
@@ -3840,13 +3777,12 @@ sub nic_nfsn_update {
         my $list_path = "/dns/$zone/listRRs";
         my $list_body = encode_www_form_urlencoded({name => $name, type => 'A'});
         my $list_resp = nic_nfsn_make_request($h, $list_path, 'POST', $list_body);
-        if (!header_ok($h, $list_resp)) {
+        if (!defined($list_resp) || $list_resp eq '') {
             $config{$h}{'status'} = 'failed';
-            nic_nfsn_handle_error($list_resp, $h);
+##            nic_nfsn_handle_error($list_resp, $h);
             next;
         }
 
-        $list_resp =~ s/^.*?\n\n//s;  # Strip header
         my $list = eval { decode_json($list_resp) };
         if ($@) {
             $config{$h}{'status'} = 'failed';
@@ -3865,9 +3801,9 @@ sub nic_nfsn_update {
             my $rm_body = encode_www_form_urlencoded($rm_data);
             my $rm_resp = nic_nfsn_make_request($h, $rm_path,
                                                 'POST', $rm_body);
-            if (!header_ok($h, $rm_resp)) {
+            if (!defined($rm_resp) || $rm_resp eq '') {
                 $config{$h}{'status'} = 'failed';
-                nic_nfsn_handle_error($rm_resp);
+#                nic_nfsn_handle_error($rm_resp);
                 next;
             }
         }
@@ -3880,14 +3816,14 @@ sub nic_nfsn_update {
         my $add_body = encode_www_form_urlencoded($add_data);
         my $add_resp = nic_nfsn_make_request($h, $add_path, 'POST',
                                              $add_body);
-        if (header_ok($h, $add_resp)) {
+        if (!defined($add_resp) || $add_resp eq '') {
             $config{$h}{'ip'}     = $ip;
             $config{$h}{'mtime'}  = $now;
             $config{$h}{'status'} = 'good';
             success("updating %s: good: IP address set to %s", $h, $ip);
         } else {
             $config{$h}{'status'} = 'failed';
-            nic_nfsn_handle_error($add_resp, $h);
+#            nic_nfsn_handle_error($add_resp, $h);
         }
     }
 }
@@ -3955,7 +3891,6 @@ sub nic_sitelutions_update {
             failed("updating %s: Could not connect to %s.", $h, $config{$h}{'server'});
             next;
         }
-        next if !header_ok($h, $reply);
 
         my @reply = split /\n/, $reply;
         if (grep /success/i, @reply) {
@@ -4037,8 +3972,7 @@ sub nic_freedns_update {
     (my $url = $url_tmpl) =~ s/<credentials>/$creds/;
     my $reply = geturl({ proxy => opt('proxy'), url => $url });
     my $record_list_error = '';
-    if ($reply && header_ok($_[0], $reply)) {
-        $reply =~ s/^.*?\n\n//s;  # Strip the headers.
+    if ($reply) {
         for (split("\n", $reply)) {
             my @rec = split(/\|/);
             next if ($#rec < 2);
@@ -4086,13 +4020,12 @@ sub nic_freedns_update {
             my $url = $rec->[2] . "&address=" . $ip;
             debug("Update: %s", $url);
             my $reply = geturl({proxy => opt('proxy'), url => $url });
-            if (!defined($reply) || !$reply || !header_ok($h, $reply)) {
+            if (!defined($reply) || !$reply) {
                 $config{$h}{'status'} = 'failed';
                 failed("updating %s: Could not connect to %s.", $h, $url);
                 next;
             }
 
-            $reply =~ s/^.*?\n\n//s;  # Strip the headers.
             if ($reply =~ /Updated.*$h.*to.*$ip/) {
                 $config{$h}{'ip'}     = $ip;
                 $config{$h}{'mtime'}  = $now;
@@ -4170,7 +4103,6 @@ sub nic_changeip_update {
             failed("updating %s: Could not connect to %s.", $h, $config{$h}{'server'});
             next;
         }
-        next if !header_ok($h, $reply);
 
         my @reply = split /\n/, $reply;
         if (grep /success/i, @reply) {
@@ -4257,7 +4189,6 @@ sub nic_googledomains_update {
                 failed("updating %s: Could not connect to %s.", $host, $config{$host}{'server'});
                 next;
             }
-            next if !header_ok($host, $reply);
 
             # Cache
             $config{$host}{'ip'}     = $ip;
@@ -4466,10 +4397,7 @@ sub nic_cloudflare_update {
                 failed("updating %s: Could not connect to %s.", $domain, $config{$key}{'server'});
                 next;
             }
-            next if !header_ok($domain, $reply);
 
-            # Strip header
-            $reply =~ s/^.*?\n\n//s;
             my $response = eval { decode_json($reply) };
             if (!defined $response || !defined $response->{result}) {
                 failed("invalid json or result.");
@@ -4497,10 +4425,7 @@ sub nic_cloudflare_update {
                 failed("updating %s: Could not connect to %s.", $domain, $config{$key}{'server'});
                 next;
             }
-            next if !header_ok($domain, $reply);
 
-            # Strip header
-            $reply =~ s/^.*?\n\n//s;
             $response = eval { decode_json($reply) };
             if (!defined $response || !defined $response->{result}) {
                 failed("invalid json or result.");
@@ -4529,10 +4454,7 @@ sub nic_cloudflare_update {
                 failed("updating %s: Could not connect to %s.", $domain, $config{$domain}{'server'});
                 next;
             }
-            next if !header_ok($domain, $reply);
 
-            # Strip header
-            $reply =~ s/^.*?\n\n//s;
             $response = eval { decode_json($reply) };
             if (!defined $response || !defined $response->{result}) {
                 failed("invalid json or result.");
@@ -4613,10 +4535,7 @@ sub nic_yandex_update {
                 failed("updating %s: Could not connect to %s.", $host, $config{$key}{'server'});
                 next;
             }
-            next if !header_ok($host, $reply);
 
-            # Strip header
-            $reply =~ s/^.*?\n\n//s;
             my $response = eval { decode_json($reply) };
             if ($response->{success} eq 'error') {
                 failed("%s", $response->{error});
@@ -4650,10 +4569,7 @@ sub nic_yandex_update {
                 failed("updating %s: Could not connect to %s.", $host, $config{$host}{'server'});
                 next;
             }
-            next if !header_ok($host, $reply);
 
-            # Strip header
-            $reply =~ s/^.*?\n\n//s;
             $response = eval { decode_json($reply) };
             if ($response->{success} eq 'error') {
                 failed("%s", $response->{error});
@@ -4730,7 +4646,6 @@ sub nic_duckdns_update {
             failed("updating %s: Could not connect to %s.", $h, $config{$h}{'server'});
             next;
         }
-        next if !header_ok($h, $reply);
 
         my @reply = split /\n/, $reply;
         my $returned = pop(@reply);
@@ -4801,7 +4716,6 @@ sub nic_freemyip_update {
             failed("updating %s: Could not connect to %s.", $h, $config{$h}{'server'});
             next;
         }
-        next if !header_ok($h, $reply);
 
         my @reply = split /\n/, $reply;
         my $returned = pop(@reply);
@@ -4930,63 +4844,50 @@ sub nic_woima_update {
             failed("updating %s: Could not connect to %s.", $h, $config{$h}{'server'});
             next;
         }
-        next if !header_ok($h, $reply);
 
         my @reply      = split /\n/, $reply;
-        my $state      = 'header';
         my $returnedip = $ip;
 
         foreach my $line (@reply) {
-            if ($state eq 'header') {
-                $state = 'body';
 
-            } elsif ($state eq 'body') {
-                $state = 'results' if $line eq '';
+            # bug #10: some dyndns providers does not return the IP so
+            # we can't use the returned IP
+            my ($status, $returnedip) = split / /, lc $line;
+            $ip = $returnedip if (not $ip);
 
-            } elsif ($state =~ /^results/) {
-                $state = 'results2';
+            $config{$h}{'status'} = $status;
+            if ($status eq 'good') {
+                $config{$h}{'ip'}    = $ip;
+                $config{$h}{'mtime'} = $now;
+                success("updating %s: %s: IP address set to %s", $h, $status, $ip);
 
-                # bug #10: some dyndns providers does not return the IP so
-                # we can't use the returned IP
-                my ($status, $returnedip) = split / /, lc $line;
-                $ip = $returnedip if (not $ip);
-
-                $config{$h}{'status'} = $status;
-                if ($status eq 'good') {
-                    $config{$h}{'ip'}    = $ip;
-                    $config{$h}{'mtime'} = $now;
-                    success("updating %s: %s: IP address set to %s", $h, $status, $ip);
-
-                } elsif (exists $errors{$status}) {
-                    if ($status eq 'nochg') {
-                        warning("updating %s: %s: %s", $h, $status, $errors{$status});
-                        $config{$h}{'ip'}     = $ip;
-                        $config{$h}{'mtime'}  = $now;
-                        $config{$h}{'status'} = 'good';
-
-                    } else {
-                        failed("updating %s: %s: %s", $h, $status, $errors{$status});
-                    }
-
-                } elsif ($status =~ /w(\d+)(.)/) {
-                    my ($wait, $units) = ($1, lc $2);
-                    my ($sec,  $scale) = ($wait, 1);
-
-                    ($scale, $units) = (1, 'seconds')   if $units eq 's';
-                    ($scale, $units) = (60, 'minutes')  if $units eq 'm';
-                    ($scale, $units) = (60*60, 'hours') if $units eq 'h';
-
-                    $sec = $wait * $scale;
-                    $config{$h}{'wtime'} = $now + $sec;
-                    warning("updating %s: %s: wait %s %s before further updates", $h, $status, $wait, $units);
+            } elsif (exists $errors{$status}) {
+                if ($status eq 'nochg') {
+                    warning("updating %s: %s: %s", $h, $status, $errors{$status});
+                    $config{$h}{'ip'}     = $ip;
+                    $config{$h}{'mtime'}  = $now;
+                    $config{$h}{'status'} = 'good';
 
                 } else {
-                    failed("updating %s: unexpected status (%s)", $h, $line);
+                    failed("updating %s: %s: %s", $h, $status, $errors{$status});
                 }
+
+            } elsif ($status =~ /w(\d+)(.)/) {
+                my ($wait, $units) = ($1, lc $2);
+                my ($sec,  $scale) = ($wait, 1);
+
+                ($scale, $units) = (1, 'seconds')   if $units eq 's';
+                ($scale, $units) = (60, 'minutes')  if $units eq 'm';
+                ($scale, $units) = (60*60, 'hours') if $units eq 'h';
+
+                $sec = $wait * $scale;
+                $config{$h}{'wtime'} = $now + $sec;
+                warning("updating %s: %s: wait %s %s before further updates", $h, $status, $wait, $units);
+
+            } else {
+                failed("updating %s: unexpected status (%s)", $h, $line);
             }
         }
-        failed("updating %s: Could not connect to %s.", $h, $config{$h}{'server'})
-            if $state ne 'results2';
     }
 }
 
@@ -5048,7 +4949,6 @@ sub nic_dondominio_update {
             failed("updating %s: Could not connect to %s.", $h, $config{$h}{'server'});
             next;
         }
-        next if !header_ok($h, $reply);
 
         my @reply = split /\n/, $reply;
         my $returned = pop(@reply);
@@ -5134,7 +5034,6 @@ sub nic_dnsmadeeasy_update {
             failed("Updating %s: Could not connect to %s.", $h, $config{$h}{'server'});
             next;
         }
-        next if !header_ok($h, $reply);
 
         my @reply = split /\n/, $reply;
         my $returned = pop(@reply);
@@ -5272,12 +5171,11 @@ sub nic_cloudns_update {
             url => $dynurl . '&proxy=1',
             headers => "X-Forwarded-For: $ip\n",
         });
-        if (($reply // '') eq '' || !header_ok($hosts, $reply)) {
+        if (($reply // '') eq '') {
             $config{$_}{'status'} = 'failed' for @hosts;
             failed("updating %s: failed to visit DynURL", $hosts);
             next;
         }
-        $reply =~ s/^.*?\n\n//s;  # Strip the headers.
         chomp($reply);
         if ($reply eq "The record's key is wrong!" || $reply eq "Invalid request.") {
             $config{$_}{'status'} = 'failed' for @hosts;
@@ -5342,8 +5240,7 @@ sub nic_dinahosting_update {
             failed("updating %s: failed to visit URL %s", $h, $url);
             next;
         }
-        next if !header_ok($h, $reply);
-        $reply =~ s/^.*?\n\n//s;  # Strip the headers.
+
         if ($reply !~ /Success/i) {
             $reply =~ /^responseCode = (\d+)$/m;
             my $code = $1 // '<undefined>';
