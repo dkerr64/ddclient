@@ -2274,7 +2274,6 @@ sub get_ip {
     return $ip;
 }
 
-
 ######################################################################
 ## Regex to find IPv4 address. Accepts embedded leading zeros.
 ######################################################################
@@ -2336,7 +2335,7 @@ my $regex_ipv6 = qr/
           |                  # OR compressed form with the double colon in the middle:
             (?=                 # Only consider this case if the prefix...
               (?&g0_){3,6}      # ...has 3 to 6 possibly empty groups...
-              (?&ip4)(?!(?&x))  # ...then ends.
+              (?&ip4)(?!(?&x))  # ...then a IPv4 address and then ends.
             )                   # If the condition is true, then:
             (?&g_){1,4}         #   1 to 4 non-empty groups before the double colon
             (?&_g){1,4}         #   1 to 4 non-empty groups after the double colon
@@ -2382,7 +2381,6 @@ my $regex_ipv6_gua = qr/
     (?=[A-F0-9]{1,4}:)      # But does start with something
     $regex_ipv6             # And is a valid IPv6 address
 /xi;
-
 
 ######################################################################
 ## is_ipv6_gua() validates if string is valid IPv6 Global Unicast Address (GUA)
