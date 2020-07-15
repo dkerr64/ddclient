@@ -2376,7 +2376,7 @@ sub extract_ipv6 {
 my $regex_ipv6_gua = qr/
     (?<![:.0-9A-Z])         # Not preceded by a character that could be in the address
     (?!F[CDF][A-F0-9]{2}:)  # Not a multicast or ULA
-    (?!FE[89A-F][A-F0-9]:)  # And not a link local
+    (?!FE[89AB][A-F0-9]:)   # And not a link local
     (?!0{0,4}:)             # And does not start with zeros
     (?=[A-F0-9]{1,4}:)      # But does start with something
     $regex_ipv6             # And is a valid IPv6 address
