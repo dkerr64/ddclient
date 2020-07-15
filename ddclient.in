@@ -2366,10 +2366,20 @@ sub extract_ipv6 {
 
 ######################################################################
 ## Regex that matches an IPv6 GUA address. Accepts embedded leading zeros.
-## Accepts IPv4-mapped IPv6 addresses such as 2001:ff9b::192.0.2.13.
+## A Global Unicast Address (GUA) is any address in a range not otherwise
+## reserved.  So rule out any ULA (FC00::/7), multicast (FF00::/8) or
+## link local (FE80::/10) addresses. To simplify match we require that it
+## start with a non-zero /16 prefix. The negative lookahead at the very
+## start is not required but significantly reduces the number of steps
+## required to match (ie, approx 2x faster).
 ######################################################################
 my $regex_ipv6_gua = qr/
-    (?=[23][A-F0-9]{3}:)$regex_ipv6
+    (?<![:.0-9A-Z])         # Not preceded by a character that could be in the address
+    (?!F[CDF][A-F0-9]{2}:)  # Not a multicast or ULA
+    (?!FE[89A-F][A-F0-9]:)  # And not a link local
+    (?!0{0,4}:)             # And does not start with zeros
+    (?=[A-F0-9]{1,4}:)      # But does start with something
+    $regex_ipv6             # And is a valid IPv6 address
 /xi;
 
 
