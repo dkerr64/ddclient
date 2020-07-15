@@ -2865,7 +2865,8 @@ sub get_default_interface {
 ######################################################################
 sub get_ip_from_interface {
     my $if = shift // "default";
-    my $ipver = shift // 4;   ## Defaults to IPv6 if not specified
+    my $ipver = shift // 4;   ## Defaults to IPv4 if not specified
+    my $ip6type = lc(shift // "gua"); ## either "gua" or "ula"
     my $reply = shift // '';  ## Pass in data for unit testing purposes only
     my $MacOS = shift // 0;   ## For testing can set to 1 if input data is MacOS format
     my $count = 0;
@@ -2873,6 +2874,10 @@ sub get_ip_from_interface {
     if (($ipver != 4) && ($ipver != 6)) {
         warning("get_ip_from_interface() invalid IP version: %s", $ipver);
         return undef;
+    }
+    if (("$ip6type" != "gua") && ("$ip6type" != "ula")) {
+        warning("get_ip_from_interface() invalid IPv6 type: %s, using type GUA", $ip6type);
+        $ip6type = "gua";
     }
 
     $if = get_default_interface($ipver) if (lc($if) eq "default");
@@ -2910,8 +2915,9 @@ sub get_ip_from_interface {
     debug2("Raw IPv6 address information for %s: (%s)\r\n%s", $if, scalar(@reply), join("\n", @reply));
     @reply = grep(!/\bdeprecated\b|\btemporary\b/, @reply); 
     debug2("After removing deprecated and temporary addresses %s: (%s)\r\n%s", $if, scalar(@reply), join("\n", @reply));
-    @reply = grep(/$regex_ipv6_gua/, @reply);
-    debug2("After filtering for GUA addresses %s: (%s)\r\n%s", $if, scalar(@reply), join("\n", @reply));
+    @reply = ("$ip6type" == "gua") ? grep(/$regex_ipv6_gua/, @reply)
+                                   : grep(/(?=F[CD][A-F0-9]{2}:)$regex_ipv6/, @reply);
+    debug2("After filtering for %s addresses %s: (%s)\r\n%s", uc($ip6type), $if, scalar(@reply), join("\n", @reply));
 
     ## If we filter down to zero or one result then we are done...
     return undef if (($count = scalar(@reply)) == 0);
