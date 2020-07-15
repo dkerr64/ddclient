@@ -2434,7 +2434,6 @@ sub curl_cmd {
     debug("CURL Tempfile: %s",$tmpfile);
     local $\ = "\n";  ## Terminate the file,
     local $, = "\n";  ## and each parameter, with a newline.
-
     print($tfh @params);
     close($tfh);
 
@@ -2517,6 +2516,7 @@ sub fetch_via_curl {
         verbose("SENDING:", "%s", "${server}/${url}");
     } else {
         push(@curlopt, "silent");
+        push(@curlopt, "include");  ## Include HTTP response for compatibility
         push(@curlopt, "insecure") if ($use_ssl && !($params->{ssl_validate} // 1));
         push(@curlopt, "cacert=\"".escape_curl_param(opt('ssl_ca_file')).'"') if defined(opt('ssl_ca_file'));
         push(@curlopt, "capath=\"".escape_curl_param(opt('ssl_ca_dir')).'"') if defined(opt('ssl_ca_dir'));
