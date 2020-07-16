@@ -84,7 +84,12 @@ for my $tc (@test_cases) {
         my $name = sprintf("IPv%s client to %s (-%sipv6)",
                            $tc->{client_ipv} || '*', $uri, $tc->{ipv6_opt} ? '' : 'no');
         $ddclient::globals{'ipv6'} = $tc->{ipv6_opt};
+        $ddclient::globals{'curl'} = 0;
         my $got = ddclient::geturl({ url => $uri, ipversion => $tc->{client_ipv} });
+        isnt($got // '', '', $name);
+        $name = $name . " (curl)";
+        $ddclient::globals{'curl'} = 1;
+        $got = ddclient::geturl({ url => $uri, ipversion => $tc->{client_ipv} });
         isnt($got // '', '', $name);
     }
 }
