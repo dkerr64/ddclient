@@ -2172,6 +2172,7 @@ sub curl_cmd {
     my @params = @_;
     my $tmpfile;
     my $tfh;
+    my $system_curl = subst_var('@syscurlcmd@', '/usr/bin/curl');
     my %curl_codes = (  ## Subset of error codes from https://curl.haxx.se/docs/manpage.html
          2 => "Failed to initialize. (Most likely a bug in ddclient, please open issue at https://github.com/ddclient/ddclient)",
          3 => "URL malformed. The syntax was not correct",
@@ -2212,7 +2213,7 @@ sub curl_cmd {
     local $SIG{'HUP'} = sub { unlink($tmpfile); $caught_hup = 1; exit 1 if !$daemon; };
     local $SIG{'INT'} = sub { unlink($tmpfile); $caught_term = 1; exit 2 if !$daemon; };
     local $SIG{'TERM'} = sub { unlink($tmpfile); $caught_int = 1; exit 15 if !$daemon; };
-    my $reply = qx{ /usr/bin/curl --config '$tmpfile' 2>/dev/null; };
+    my $reply = qx{ $system_curl --config '$tmpfile' 2>/dev/null; };
     if ((my $rc = $?>>8) != 0) {
         warning("CURL error (%d) %s", $rc, $curl_codes{$rc} // "Unknown return code, check curl man page.");
     }
