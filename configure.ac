@@ -27,6 +27,11 @@ AC_PROG_MKDIR_P
 AC_PATH_PROG([FIND], [find])
 AS_IF([test -z "${FIND}"], [AC_MSG_ERROR(['find' utility not found])])
 
+# Look for location of curl on this system in case it is something
+# other than /usr/bin/curl
+AC_PATH_PROG([CURL], [curl], "/usr/bin/curl")
+AC_SUBST([CURL])
+
 AX_WITH_PROG([PERL], perl)
 AX_PROG_PERL_VERSION([5.10.1], [],
   [AC_MSG_ERROR([Perl 5.10.1 or newer not found])])

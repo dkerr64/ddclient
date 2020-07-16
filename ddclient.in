@@ -2401,6 +2401,7 @@ sub curl_cmd {
     my @params = @_;
     my $tmpfile;
     my $tfh;
+    my $system_curl = subst_var('@syscurlcmd@', '/usr/bin/curl');
     my %curl_codes = (  ## Subset of error codes from https://curl.haxx.se/docs/manpage.html
          2 => "Failed to initialize. (Most likely a bug in ddclient, please open issue at https://github.com/ddclient/ddclient)",
          3 => "URL malformed. The syntax was not correct",
@@ -2417,6 +2418,7 @@ sub curl_cmd {
         67 => "The user name, password, or similar was not accepted and curl failed to log in.",
         77 => "Problem with reading the SSL CA cert (path? access rights?).",
         78 => "The resource referenced in the URL does not exist.",
+       127 => "You requested network access with curl but $system_curl was not found",
     );
 
     return '' if (scalar(@params) == 0); ## no parameters provided
@@ -2441,9 +2443,9 @@ sub curl_cmd {
     local $SIG{'HUP'} = sub { unlink($tmpfile); $caught_hup = 1; exit 1 if !$daemon; };
     local $SIG{'INT'} = sub { unlink($tmpfile); $caught_term = 1; exit 2 if !$daemon; };
     local $SIG{'TERM'} = sub { unlink($tmpfile); $caught_int = 1; exit 15 if !$daemon; };
-    my $reply = qx{ /usr/bin/curl --config '$tmpfile' 2>/dev/null; };
+    my $reply = qx{ $system_curl --config '$tmpfile' 2>/dev/null; };
     if ((my $rc = $?>>8) != 0) {
-        warning("CURL error (%d) %s", $rc, $curl_codes{$rc} // "Unknown return code, check curl man page.");
+        warning("CURL error (%d) %s", $rc, $curl_codes{$rc} // "Unknown return code. Check $system_curl is installed and its manpage.");
     }
     unlink($tmpfile);
     return $reply;
@@ -2488,10 +2490,6 @@ sub fetch_via_curl {
     my $timeout  = opt('timeout');
     my @curlopt = ();
     my @header_lines = ();
-
-    if (!`curl --version 2>/dev/null`) {
-        fatal("You requested network access with curl but curl is not installed.");
-    }
 
     ## canonify proxy and url
     $force_ssl = 1 if ($url =~ /^https:/);
