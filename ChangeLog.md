@@ -19,6 +19,10 @@ repository history](https://github.com/ddclient/ddclient/commits/master).
     addresses.
   * New `ssl_ca_dir` and `ssl_ca_file` options to specify the location of CA
     certificates.
+  * Added option `-curl` to access network with system Curl command instead
+    of the Perl built-in IO::Socket classes.
+  * Added option `-{no}ssl-validate` to provide option to disable SSL
+    certificate validation
 
 ### Bug fixes
 
