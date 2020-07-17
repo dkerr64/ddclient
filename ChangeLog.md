@@ -22,7 +22,10 @@ repository history](https://github.com/ddclient/ddclient/commits/master).
   * Added option `-curl` to access network with system Curl command instead
     of the Perl built-in IO::Socket classes.
   * Added option `-{no}ssl-validate` to provide option to disable SSL
-    certificate validation
+    certificate validation.  Note that `-nossl-validate` only applies for
+    network access when obtaining an IP address with `use=web` or `use=fw`
+    (any firewall).  Network access to Dynamic DNS servers to set or retrieve
+    IP address will always require certificate validation.
 
 ### Bug fixes
 
