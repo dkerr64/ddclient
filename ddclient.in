@@ -2208,9 +2208,11 @@ sub curl_cmd {
 
     chmod(0600,$tmpfile);
     debug("CURL Tempfile: %s",$tmpfile);
-    local $\ = "\n";  ## Terminate the file,
-    local $, = "\n";  ## and each parameter, with a newline.
-    print($tfh @params);
+    {
+        local $\ = "\n";  ## Terminate the file,
+        local $, = "\n";  ## and each parameter, with a newline.
+        print($tfh @params);
+    }
     close($tfh);
 
     ## Make sure to delete temp file on Ctrl-C or SIGTERM
