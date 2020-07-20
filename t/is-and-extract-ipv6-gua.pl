@@ -4,7 +4,7 @@ use B qw(perlstring);
 SKIP: { eval { require Test::Warnings; } or skip($@, 1); }
 eval { require 'ddclient'; } or BAIL_OUT($@);
 
-my @valid_ipv6_not_gua = (
+my @valid_ipv6_not_global = (
     # Unassigned address
     "::",
     "::0",
@@ -59,7 +59,7 @@ my @valid_ipv6_not_gua = (
     "FF11:2222:3333:4444:5555:6666:7777:8888",
 );
 
-my @valid_ipv6_gua = (
+my @valid_ipv6_global = (
     "2001::abcd:efAB:CDEF",  # case sensitivity
     "2001:09:0a:0b:0c:0d:0e:0f",  # leading zeros
     # Miscelaneous valid GUAs
@@ -373,46 +373,46 @@ EOF
 );
 
 
-subtest "is_ipv6_gua() with valid addresses, but invalid GUA" => sub {
-    foreach my $ip (@valid_ipv6_not_gua) {
+subtest "is_ipv6_global() with valid addresses, but invalid GUA" => sub {
+    foreach my $ip (@valid_ipv6_not_global) {
         # gua test should fail, but non-gua should pass
-        ok(!ddclient::is_ipv6_gua($ip), "!is_ipv6_gua('$ip')");
+        ok(!ddclient::is_ipv6_global($ip), "!is_ipv6_global('$ip')");
         ok(ddclient::is_ipv6($ip), "is_ipv6('$ip')");
     }
 };
 
-subtest "is_ipv6_gua() with valid GUA ddresses" => sub {
-    foreach my $ip (@valid_ipv6_gua) {
+subtest "is_ipv6_global() with valid GUA ddresses" => sub {
+    foreach my $ip (@valid_ipv6_global) {
         # both gua and non-gua tests should pass
-        ok(ddclient::is_ipv6_gua($ip), "is_ipv6_gua('$ip')");
+        ok(ddclient::is_ipv6_global($ip), "is_ipv6_global('$ip')");
         ok(ddclient::is_ipv6($ip), "is_ipv6('$ip')");
     }
 };
 
-subtest "is_ipv6_gua() with invalid addresses" => sub {
+subtest "is_ipv6_global() with invalid addresses" => sub {
     foreach my $ip (@invalid_ipv6) {
-        ok(!ddclient::is_ipv6_gua($ip), sprintf("!is_ipv6_gua(%s)", defined($ip) ? "'$ip'" : 'undef'));
+        ok(!ddclient::is_ipv6_global($ip), sprintf("!is_ipv6_global(%s)", defined($ip) ? "'$ip'" : 'undef'));
     }
 };
 
-subtest "is_ipv6_gua() with char adjacent to valid address" => sub {
+subtest "is_ipv6_global() with char adjacent to valid address" => sub {
     foreach my $ch (split(//, '/.,:z @$#&%!^*()_-+'), "\n") {
         subtest perlstring($ch) => sub {
-            foreach my $ip (@valid_ipv6_gua) {
+            foreach my $ip (@valid_ipv6_global) {
                 subtest $ip => sub {
                     my $test = $ch . $ip;  # insert at front
-                    ok(!ddclient::is_ipv6_gua($test), "!is_ipv6_gua('$test')");
+                    ok(!ddclient::is_ipv6_global($test), "!is_ipv6_global('$test')");
                     $test = $ip . $ch;  # add at end
-                    ok(!ddclient::is_ipv6_gua($test), "!is_ipv6_gua('$test')");
+                    ok(!ddclient::is_ipv6_global($test), "!is_ipv6_global('$test')");
                     $test = $ch . $ip . $ch; # wrap front and end
-                    ok(!ddclient::is_ipv6_gua($test), "!is_ipv6_gua('$test')");
+                    ok(!ddclient::is_ipv6_global($test), "!is_ipv6_global('$test')");
                 };
             }
         };
     }
 };
 
-subtest "extract_ipv6_gua()" => sub {
+subtest "extract_ipv6_global()" => sub {
     my @test_cases = (
         {name => "undef",            text => undef,               want => undef},
         {name => "empty",            text => "",                  want => undef},
@@ -429,18 +429,18 @@ subtest "extract_ipv6_gua()" => sub {
         {name => "GUA zero pad",         text => "2001::0001",        want => "2001::1"},
     );
     foreach my $tc (@test_cases) {
-        is(ddclient::extract_ipv6_gua($tc->{text}), $tc->{want}, $tc->{name});
+        is(ddclient::extract_ipv6_global($tc->{text}), $tc->{want}, $tc->{name});
     }
 };
 
-subtest "extract_ipv6_gua() of valid GUA addr with adjacent non-word char" => sub {
+subtest "extract_ipv6_global() of valid GUA addr with adjacent non-word char" => sub {
     foreach my $wb (split(//, '/, @$#&%!^*()_-+'), "\n") {
         subtest perlstring($wb) => sub {
             my $test = "";
-            foreach my $ip (@valid_ipv6_gua) {
+            foreach my $ip (@valid_ipv6_global) {
                 $test = "foo" . $wb . $ip . $wb . "bar"; # wrap front and end
                 $ip =~ s/\b0+\B//g; ## remove embedded leading zeros for testing
-                is(ddclient::extract_ipv6_gua($test), $ip, perlstring($test));
+                is(ddclient::extract_ipv6_global($test), $ip, perlstring($test));
             }
         };
     }
@@ -450,19 +450,19 @@ subtest "interface config samples" => sub {
     for my $sample (@if_samples) {
         my ($name, $text) = @$sample;
         subtest $name => sub {
-            my $ip = ddclient::extract_ipv6_gua($text);  # all samples have at least one GUA
-            ok(ddclient::is_ipv6_gua($ip), "extract_ipv6_gua(\$text) returns an IPv6 GUA address");
+            my $ip = ddclient::extract_ipv6_global($text);  # all samples have at least one GUA
+            ok(ddclient::is_ipv6_global($ip), "extract_ipv6_global(\$text) returns an IPv6 GUA address");
             foreach my $line (split(/\n/, $text)) {
                 my $ip = ddclient::extract_ipv6($line);
-                if (ddclient::is_ipv6_gua($ip)) {
+                if (ddclient::is_ipv6_global($ip)) {
                     # If we extraced a GUA we should get the same by explicitly extracting a GUA !
-                    $ip = ddclient::extract_ipv6_gua($line);
-                    ok(ddclient::is_ipv6_gua($ip),
-                        sprintf("extract_ipv6_gua(%s) returns an IPv6 GUA address", perlstring($line)));
+                    $ip = ddclient::extract_ipv6_global($line);
+                    ok(ddclient::is_ipv6_global($ip),
+                        sprintf("extract_ipv6_global(%s) returns an IPv6 GUA address", perlstring($line)));
                 } else {
                     # But if it wasn't a GUA then we shouldn't be able to extract it with GUA specific fn.
-                    ok(!ddclient::extract_ipv6_gua($line),
-                        sprintf("extract_ipv6_gua(%s) returns no IPv6 GUA address", perlstring($line)));
+                    ok(!ddclient::extract_ipv6_global($line),
+                        sprintf("extract_ipv6_global(%s) returns no IPv6 GUA address", perlstring($line)));
                 }
             }
         }

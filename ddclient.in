@@ -2340,7 +2340,7 @@ my $regex_ipv6 = qr/
           |                  # OR compressed form with the double colon in the middle:
             (?=                 # Only consider this case if the prefix...
               (?&g0_){3,6}      # ...has 3 to 6 possibly empty groups...
-              (?&ip4)(?!(?&x))  # ...then a IPv4 address and then ends.
+              (?&ip4)(?!(?&x))  # ...then ends.
             )                   # If the condition is true, then:
             (?&g_){1,4}         #   1 to 4 non-empty groups before the double colon
             (?&_g){1,4}         #   1 to 4 non-empty groups after the double colon
@@ -2370,37 +2370,34 @@ sub extract_ipv6 {
 }
 
 ######################################################################
-## Regex that matches an IPv6 GUA address. Accepts embedded leading zeros.
+## Regex that matches an IPv6 global address. Accepts embedded leading zeros.
 ## A Global Unicast Address (GUA) is any address in a range not otherwise
 ## reserved.  So rule out any ULA (FC00::/7), multicast (FF00::/8) or
-## link local (FE80::/10) addresses. To simplify match we require that it
-## start with a non-zero /16 prefix. The negative lookahead at the very
-## start is not required but significantly reduces the number of steps
-## required to match (ie, approx 2x faster).
+## link local (FE80::/10) addresses. We also require that it start
+## with a non-zero /16 prefix though strictly a GUA could.
 ######################################################################
-my $regex_ipv6_gua = qr/
-    (?<![:.0-9A-Z])         # Not preceded by a character that could be in the address
-    (?!F[CDF][A-F0-9]{2}:)  # Not a multicast or ULA
+my $regex_ipv6_global = qr/
+    (?!FF[A-F0-9]{2}:)      # Not a multicast
+    (?!F[CD][A-F0-9]{2}:)   # And not a ULA
     (?!FE[89AB][A-F0-9]:)   # And not a link local
     (?!0{0,4}:)             # And does not start with zeros
-    (?=[A-F0-9]{1,4}:)      # But does start with something
     $regex_ipv6             # And is a valid IPv6 address
 /xi;
 
 ######################################################################
-## is_ipv6_gua() validates if string is valid IPv6 Global Unicast Address (GUA)
+## is_ipv6_global() validates if string is valid IPv6 Global Unicast Address (GUA)
 ## with no preceding or trailing spaces/characters, not even line breaks.
 ######################################################################
-sub is_ipv6_gua {
-    return (shift // '') =~ /\A($regex_ipv6_gua)\z/
+sub is_ipv6_global {
+    return (shift // '') =~ /\A($regex_ipv6_global)\z/
 }
 
 ######################################################################
-## extract_ipv6_gua() finds the first valid IPv6 GUA address in the given
+## extract_ipv6_global() finds the first valid IPv6 GUA address in the given
 ## string, removes embedded leading zeros, and returns the result.
 ######################################################################
-sub extract_ipv6_gua {
-    (shift // '') =~ /($regex_ipv6_gua)/ or return undef;
+sub extract_ipv6_global {
+    (shift // '') =~ /($regex_ipv6_global)/ or return undef;
     (my $ip = $1) =~ s/\b0+\B//g; ## remove embedded leading zeros
     return $ip;
 }
