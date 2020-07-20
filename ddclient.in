@@ -2175,7 +2175,7 @@ sub curl_cmd {
     my @params = @_;
     my $tmpfile;
     my $tfh;
-    my $system_curl = subst_var('@syscurlcmd@', '/usr/bin/curl');
+    my $system_curl = subst_var('@CURL@', '/usr/bin/curl');
     my %curl_codes = (  ## Subset of error codes from https://curl.haxx.se/docs/manpage.html
          2 => "Failed to initialize. (Most likely a bug in ddclient, please open issue at https://github.com/ddclient/ddclient)",
          3 => "URL malformed. The syntax was not correct",
