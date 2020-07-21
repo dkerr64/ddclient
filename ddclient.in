@@ -2201,7 +2201,6 @@ sub curl_cmd {
     ## Use system File::Temp to generate filename...
     use File::Temp;
     $tfh = File::Temp->new( TMPDIR => 1,  ## in system temp dir
-                            UNLINK => 0,  ## we will delete it ourselves
                             TEMPLATE => 'ddclient_XXXXXXXXXX');
     $tmpfile = $tfh->filename;
 
@@ -2217,7 +2216,6 @@ sub curl_cmd {
     if ((my $rc = $?>>8) != 0) {
         warning("CURL error (%d) %s", $rc, $curl_codes{$rc} // "Unknown return code. Check $system_curl is installed and its manpage.");
     }
-    unlink($tmpfile);
     return $reply;
 }
 
