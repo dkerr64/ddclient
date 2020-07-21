@@ -1936,7 +1936,7 @@ On Red Hat, the package perl-IO-Socket-SSL must be installed.
 On Alpine, the package perl-io-socket-ssl must be installed.
 EOM
     }
-    use IO::Socket::SSL qw( SSL_VERIFY_NONE SSL_VERIFY_PEER );
+    import IO::Socket::SSL;
     { no warnings; $IO::Socket::SSL::DEBUG = 0; }
 }
 
@@ -2081,12 +2081,13 @@ sub fetch_via_socket_io {
     if ($use_ssl) {
         # IO::Socket::SSL will load IPv6 support if available on the system.
         load_ssl_support;
+        no strict "subs";
         $socket_class = 'IO::Socket::SSL';
         $socket_args{SSL_ca_file} = opt('ssl_ca_file') if defined(opt('ssl_ca_file'));
         $socket_args{SSL_ca_path} = opt('ssl_ca_dir') if defined(opt('ssl_ca_dir'));
         $socket_args{SSL_verify_mode} = ($params->{ssl_validate} // 1)
-                                        ? SSL_VERIFY_PEER
-                                        : SSL_VERIFY_NONE;
+                                        ? IO::Socket::SSL::SSL_VERIFY_PEER
+                                        : IO::Socket::SSL::SSL_VERIFY_NONE;
     } elsif ($globals{'ipv6'} || $ipversion eq '6') {
         load_ipv6_support;
         $socket_class = 'IO::Socket::INET6';
