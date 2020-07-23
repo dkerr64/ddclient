@@ -2370,11 +2370,8 @@ sub extract_ipv6 {
 }
 
 ######################################################################
-## Regex that matches an IPv6 global address. Accepts embedded leading zeros.
-## A Global Unicast Address (GUA) is any address in a range not otherwise
-## reserved.  So rule out any ULA (FC00::/7), multicast (FF00::/8) or
-## link local (FE80::/10) addresses. We also require that it start
-## with a non-zero /16 prefix though strictly a GUA could.
+## Regex that matches an IPv6 address that is probably globally routable.
+## Accepts embedded leading zeros.
 ######################################################################
 my $regex_ipv6_global = qr/
     (?!FF[A-F0-9]{2}:)      # Not a multicast
@@ -2385,16 +2382,17 @@ my $regex_ipv6_global = qr/
 /xi;
 
 ######################################################################
-## is_ipv6_global() validates if string is valid IPv6 Global Unicast Address (GUA)
-## with no preceding or trailing spaces/characters, not even line breaks.
+## is_ipv6_global() returns true if the string is a valid IPv6 address that is
+## probably globally routable, with no preceding or trailing characters.
 ######################################################################
 sub is_ipv6_global {
     return (shift // '') =~ /\A($regex_ipv6_global)\z/
 }
 
 ######################################################################
-## extract_ipv6_global() finds the first valid IPv6 GUA address in the given
-## string, removes embedded leading zeros, and returns the result.
+## extract_ipv6_global() finds the first IPv6 address that is probably globally
+## routable in the given string, removes embedded leading zeros, and returns
+## the result.
 ######################################################################
 sub extract_ipv6_global {
     (shift // '') =~ /($regex_ipv6_global)/ or return undef;
