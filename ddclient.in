@@ -1998,15 +1998,15 @@ sub geturl {
 }
 
 sub fetch_via_socket_io {
-    my ($params) = @_;
-    my $proxy = $params->{proxy};
-    my $url = $params->{url};
-    my $login = $params->{login};
-    my $password = $params->{password};
-    my $ipversion = $params->{ipversion} // '';
-    my $headers = $params->{headers} // '';
-    my $method = $params->{method} // 'GET';
-    my $data = $params->{data} // '';
+    my %params = @_;
+    my $proxy = $params{proxy};
+    my $url = $params{url};
+    my $login = $params{login};
+    my $password = $params{password};
+    my $ipversion = $params{ipversion} // '';
+    my $headers = $params{headers} // '';
+    my $method = $params{method} // 'GET';
+    my $data = $params{data} // '';
     my ($peer, $server, $port, $default_port, $use_ssl);
     my ($sd, $request, $reply);
 
@@ -2238,15 +2238,15 @@ sub escape_curl_param {
 ## fetch_via_curl() is used for geturl() when global curl option set
 ######################################################################
 sub fetch_via_curl {
-    my ($params) = @_;
-    my $proxy = $params->{proxy};
-    my $url = $params->{url};
-    my $login = $params->{login};
-    my $password = $params->{password};
-    my $ipversion = $params->{ipversion} // '';
-    my $headers = $params->{headers} // '';
-    my $method = $params->{method} // 'GET';
-    my $data = $params->{data} // '';
+    my %params = @_;
+    my $proxy = $params{proxy};
+    my $url = $params{url};
+    my $login = $params{login};
+    my $password = $params{password};
+    my $ipversion = $params{ipversion} // '';
+    my $headers = $params{headers} // '';
+    my $method = $params{method} // 'GET';
+    my $data = $params{data} // '';
 
     my $reply;
     my $server;
