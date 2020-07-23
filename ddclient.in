@@ -2374,10 +2374,12 @@ sub extract_ipv6 {
 ## Accepts embedded leading zeros.
 ######################################################################
 my $regex_ipv6_global = qr/
-    (?!FF[A-F0-9]{2}:)      # Not a multicast
-    (?!F[CD][A-F0-9]{2}:)   # And not a ULA
-    (?!FE[89AB][A-F0-9]:)   # And not a link local
-    (?!0{0,4}:)             # And does not start with zeros
+    (?!  # Is not one of the following addresses:
+        f[cd][0-9a-f]{2}:   # RFC4193 ULA
+      | fe[89ab][0-9a-f]:   # Linklocal
+      | ff[0-9a-f]{2}:      # Multicast
+      | 0{0,4}:             # Start with zeros
+    )
     $regex_ipv6             # And is a valid IPv6 address
 /xi;
 
