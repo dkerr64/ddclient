@@ -18,4 +18,5 @@ release
 /t/*.log
 /t/*.trs
 /t/version.pl
+/t/geturl_connectivity.pl
 /test-suite.log

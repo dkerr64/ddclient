@@ -75,10 +75,6 @@ my ($result, %config, %cache);
 my $saved_cache;
 my %saved_opt;
 my $daemon;
-## Following used to control exiting daemon if SIGHUP, SIGINT, SIGTERM received.
-my $caught_hup  = 0;
-my $caught_term = 0;
-my $caught_int  = 0;
 
 sub T_ANY    { 'any' }
 sub T_STRING { 'string' }
@@ -934,6 +930,9 @@ sub main {
     init_config();
     test_possible_ip() if opt('query');
 
+    my $caught_hup  = 0;
+    my $caught_term = 0;
+    my $caught_int  = 0;
     $SIG{'HUP'}  = sub { $caught_hup  = 1; };
     $SIG{'TERM'} = sub { $caught_term = 1; };
     $SIG{'INT'}  = sub { $caught_int  = 1; };
@@ -2326,9 +2325,13 @@ sub fetch_via_socket_io {
     if ($use_ssl) {
         # IO::Socket::SSL will load IPv6 support if available on the system.
         load_ssl_support;
+        no strict "subs";
         $socket_class = 'IO::Socket::SSL';
         $socket_args{SSL_ca_file} = opt('ssl_ca_file') if defined(opt('ssl_ca_file'));
         $socket_args{SSL_ca_path} = opt('ssl_ca_dir') if defined(opt('ssl_ca_dir'));
+        $socket_args{SSL_verify_mode} = ($params{ssl_validate} // 1)
+                                        ? IO::Socket::SSL->SSL_VERIFY_PEER
+                                        : IO::Socket::SSL->SSL_VERIFY_NONE;
     } elsif ($globals{'ipv6'} || $ipversion eq '6') {
         load_ipv6_support;
         $socket_class = 'IO::Socket::INET6';
@@ -2416,7 +2419,7 @@ sub curl_cmd {
     my @params = @_;
     my $tmpfile;
     my $tfh;
-    my $system_curl = subst_var('@syscurlcmd@', '/usr/bin/curl');
+    my $system_curl = subst_var('@CURL@', '/usr/bin/curl');
     my %curl_codes = (  ## Subset of error codes from https://curl.haxx.se/docs/manpage.html
          2 => "Failed to initialize. (Most likely a bug in ddclient, please open issue at https://github.com/ddclient/ddclient)",
          3 => "URL malformed. The syntax was not correct",
@@ -2438,31 +2441,23 @@ sub curl_cmd {
 
     return '' if (scalar(@params) == 0); ## no parameters provided
 
-    # debug("CURL: %s\r\n",join("\r\n      ",@params)); ## Uncomment only if required as may expose credentials
-
     ## Use system File::Temp to generate filename...
     use File::Temp;
-    $tfh = File::Temp->new( TMPDIR => 1,  ## in system temp dir
-                            UNLINK => 0,  ## we will delete it ourselves
+    $tfh = File::Temp->new( TMPDIR => "/tmp/",
                             TEMPLATE => 'ddclient_XXXXXXXXXX');
     $tmpfile = $tfh->filename;
 
-    chmod(0600,$tmpfile);
     debug("CURL Tempfile: %s",$tmpfile);
-    local $\ = "\n";  ## Terminate the file,
-    local $, = "\n";  ## and each parameter, with a newline.
-    print($tfh @params);
+    {
+        local $\ = "\n";  ## Terminate the file,
+        local $, = "\n";  ## and each parameter, with a newline.
+        print($tfh @params);
+    }
     close($tfh);
-
-    ## Make sure to delete temp file on Ctrl-C or SIGTERM
-    local $SIG{'HUP'} = sub { unlink($tmpfile); $caught_hup = 1; exit 1 if !$daemon; };
-    local $SIG{'INT'} = sub { unlink($tmpfile); $caught_term = 1; exit 2 if !$daemon; };
-    local $SIG{'TERM'} = sub { unlink($tmpfile); $caught_int = 1; exit 15 if !$daemon; };
     my $reply = qx{ $system_curl --config '$tmpfile' 2>/dev/null; };
     if ((my $rc = $?>>8) != 0) {
         warning("CURL error (%d) %s", $rc, $curl_codes{$rc} // "Unknown return code. Check $system_curl is installed and its manpage.");
     }
-    unlink($tmpfile);
     return $reply;
 }
 
@@ -2487,15 +2482,15 @@ sub escape_curl_param {
 ## fetch_via_curl() is used for geturl() when global curl option set
 ######################################################################
 sub fetch_via_curl {
-    my ($params) = @_;
-    my $proxy = $params->{proxy};
-    my $url = $params->{url};
-    my $login = $params->{login};
-    my $password = $params->{password};
-    my $ipversion = $params->{ipversion} // '';
-    my $headers = $params->{headers} // '';
-    my $method = $params->{method} // 'GET';
-    my $data = $params->{data} // '';
+    my %params = @_;
+    my $proxy = $params{proxy};
+    my $url = $params{url};
+    my $login = $params{login};
+    my $password = $params{password};
+    my $ipversion = $params{ipversion} // '';
+    my $headers = $params{headers} // '';
+    my $method = $params{method} // 'GET';
+    my $data = $params{data} // '';
 
     my $reply;
     my $server;
@@ -2514,7 +2509,7 @@ sub fetch_via_curl {
     $server =~ s%[?/].*%%;
     $url    =~ s%^[^?/]*/?%%;
 
-    $use_ssl = 1 if ($force_ssl || ($globals{'ssl'} && !($params->{ignore_ssl_option} // 0)));
+    $use_ssl = 1 if ($force_ssl || ($globals{'ssl'} && !($params{ignore_ssl_option} // 0)));
 
     $protocol = ($use_ssl ? "https" : "http");
 
@@ -2530,7 +2525,7 @@ sub fetch_via_curl {
     } else {
         push(@curlopt, "silent");
         push(@curlopt, "include");  ## Include HTTP response for compatibility
-        push(@curlopt, "insecure") if ($use_ssl && !($params->{ssl_validate} // 1));
+        push(@curlopt, "insecure") if ($use_ssl && !($params{ssl_validate} // 1));
         push(@curlopt, "cacert=\"".escape_curl_param(opt('ssl_ca_file')).'"') if defined(opt('ssl_ca_file'));
         push(@curlopt, "capath=\"".escape_curl_param(opt('ssl_ca_dir')).'"') if defined(opt('ssl_ca_dir'));
         push(@curlopt, "ipv4") if ($ipversion eq '4');

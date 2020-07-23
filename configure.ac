@@ -27,10 +27,7 @@ AC_PROG_MKDIR_P
 AC_PATH_PROG([FIND], [find])
 AS_IF([test -z "${FIND}"], [AC_MSG_ERROR(['find' utility not found])])
 
-# Look for location of curl on this system in case it is something
-# other than /usr/bin/curl
-AC_PATH_PROG([CURL], [curl], "/usr/bin/curl")
-AC_SUBST([CURL])
+AC_PATH_PROG([CURL], [curl])
 
 AX_WITH_PROG([PERL], perl)
 AX_PROG_PERL_VERSION([5.10.1], [],
@@ -44,6 +41,7 @@ AC_SUBST([PERL])
 m4_foreach_w([_m], [
     File::Basename
     File::Path
+    File::Temp
     Getopt::Long
     IO::Socket::INET
     Socket
@@ -87,5 +85,6 @@ m4_foreach_w([_m], [
 AC_CONFIG_FILES([
     Makefile
     t/version.pl
+    t/geturl_connectivity.pl
   ])
 AC_OUTPUT
