@@ -2086,8 +2086,8 @@ sub fetch_via_socket_io {
         $socket_args{SSL_ca_file} = opt('ssl_ca_file') if defined(opt('ssl_ca_file'));
         $socket_args{SSL_ca_path} = opt('ssl_ca_dir') if defined(opt('ssl_ca_dir'));
         $socket_args{SSL_verify_mode} = ($params->{ssl_validate} // 1)
-                                        ? IO::Socket::SSL::SSL_VERIFY_PEER
-                                        : IO::Socket::SSL::SSL_VERIFY_NONE;
+                                        ? IO::Socket::SSL->SSL_VERIFY_PEER
+                                        : IO::Socket::SSL->SSL_VERIFY_NONE;
     } elsif ($globals{'ipv6'} || $ipversion eq '6') {
         load_ipv6_support;
         $socket_class = 'IO::Socket::INET6';
