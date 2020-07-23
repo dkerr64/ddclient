@@ -104,7 +104,7 @@ for my $tc (@test_cases) {
                            $tc->{curl} ? ' (curl)' : '');
         $ddclient::globals{'ipv6'} = $tc->{ipv6_opt};
         $ddclient::globals{'curl'} = $tc->{curl};;
-        my $got = ddclient::geturl({ url => $uri, ipversion => $tc->{client_ipv} });
+        my $got = ddclient::geturl(url => $uri, ipversion => $tc->{client_ipv});
         isnt($got // '', '', $name);
     }
 }
