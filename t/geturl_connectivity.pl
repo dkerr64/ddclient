@@ -13,9 +13,6 @@ my $ipv6_supported = eval {
     );
     defined($ipv6_socket);
 };
-my $has_curl = eval {
-    qx{ /usr/bin/curl --version 2>/dev/null; } && $? == 0;
-};
 my $http_daemon_supports_ipv6 = eval {
     require HTTP::Daemon;
     HTTP::Daemon->VERSION(6.12);
@@ -87,16 +84,8 @@ for my $tc (@test_cases) {
         my $name = sprintf("IPv%s client to %s (-%sipv6)",
                            $tc->{client_ipv} || '*', $uri, $tc->{ipv6_opt} ? '' : 'no');
         $ddclient::globals{'ipv6'} = $tc->{ipv6_opt};
-        $ddclient::globals{'curl'} = 0;
-        my $got = ddclient::geturl({ url => $uri, ipversion => $tc->{client_ipv} });
+        my $got = ddclient::geturl(url => $uri, ipversion => $tc->{client_ipv});
         isnt($got // '', '', $name);
-        SKIP: {
-            skip("Curl not available on this system", 1) if !$has_curl;
-            $name = $name . " (curl)";
-            $ddclient::globals{'curl'} = 1;
-            $got = ddclient::geturl({ url => $uri, ipversion => $tc->{client_ipv} });
-            isnt($got // '', '', $name);
-        }
     }
 }
 
