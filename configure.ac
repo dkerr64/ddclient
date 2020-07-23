@@ -41,6 +41,7 @@ AC_SUBST([PERL])
 m4_foreach_w([_m], [
     File::Basename
     File::Path
+    File::Temp
     Getopt::Long
     IO::Socket::INET
     Socket
