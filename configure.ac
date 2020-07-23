@@ -84,5 +84,6 @@ m4_foreach_w([_m], [
 AC_CONFIG_FILES([
     Makefile
     t/version.pl
+    t/geturl_connectivity.pl
   ])
 AC_OUTPUT

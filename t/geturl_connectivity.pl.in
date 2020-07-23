@@ -14,7 +14,7 @@ my $ipv6_supported = eval {
     defined($ipv6_socket);
 };
 my $has_curl = eval {
-    qx{ /usr/bin/curl --version 2>/dev/null; } && $? == 0;
+    qx{ @CURL@ --version 2>/dev/null; } && $? == 0;
 };
 my $http_daemon_supports_ipv6 = eval {
     require HTTP::Daemon;

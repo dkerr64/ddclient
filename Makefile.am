@@ -71,7 +71,6 @@ AM_PL_LOG_FLAGS = -Mstrict -w \
 	-I'$(abs_top_srcdir)'/t/lib \
 	-MDevel::Autoflush
 handwritten_tests = \
-	t/geturl_connectivity.pl \
 	t/geturl_ssl.pl \
 	t/is-and-extract-ipv4.pl \
 	t/is-and-extract-ipv6.pl \
@@ -79,6 +78,7 @@ handwritten_tests = \
 	t/write_cache.pl
 generated_tests = \
 	t/version.pl
+	t/geturl_connectivity.pl
 TESTS = $(handwritten_tests) $(generated_tests)
 EXTRA_DIST += $(handwritten_tests) \
 	t/lib/Devel/Autoflush.pm \
