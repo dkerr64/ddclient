@@ -2197,8 +2197,6 @@ sub curl_cmd {
 
     return '' if (scalar(@params) == 0); ## no parameters provided
 
-    # debug("CURL: %s\r\n",join("\r\n      ",@params)); ## Uncomment only if required as may expose credentials
-
     ## Use system File::Temp to generate filename...
     use File::Temp;
     $tfh = File::Temp->new( TMPDIR => 1,  ## in system temp dir
