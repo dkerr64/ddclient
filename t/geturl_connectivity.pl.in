@@ -58,37 +58,33 @@ my %httpd = (
 
 # Note: IPv* client to IPv6 server is not expected to work unless $globals{'ipv6'} is true.
 my @test_cases = (
-    { ipv6_opt => 0, client_ipv => '',  server_ipv => '4', ssl => 0, curl => 0 },
-    { ipv6_opt => 0, client_ipv => '',  server_ipv => '4', ssl => 1, curl => 0 },
-    { ipv6_opt => 0, client_ipv => '4', server_ipv => '4', ssl => 0, curl => 0 },
-    { ipv6_opt => 0, client_ipv => '4', server_ipv => '4', ssl => 1, curl => 0 },
-    { ipv6_opt => 0, client_ipv => '6', server_ipv => '6', ssl => 0, curl => 0 },
-    { ipv6_opt => 0, client_ipv => '6', server_ipv => '6', ssl => 1, curl => 0 },
-    { ipv6_opt => 1, client_ipv => '',  server_ipv => '4', ssl => 0, curl => 0 },
-    { ipv6_opt => 1, client_ipv => '',  server_ipv => '4', ssl => 1, curl => 0 },
-    { ipv6_opt => 1, client_ipv => '',  server_ipv => '6', ssl => 0, curl => 0 },
-    { ipv6_opt => 1, client_ipv => '',  server_ipv => '6', ssl => 1, curl => 0 },
-    { ipv6_opt => 1, client_ipv => '4', server_ipv => '4', ssl => 0, curl => 0 },
-    { ipv6_opt => 1, client_ipv => '4', server_ipv => '4', ssl => 1, curl => 0 },
-    { ipv6_opt => 1, client_ipv => '6', server_ipv => '6', ssl => 0, curl => 0 },
-    { ipv6_opt => 1, client_ipv => '6', server_ipv => '6', ssl => 1, curl => 0 },
-    { ipv6_opt => 0, client_ipv => '',  server_ipv => '4', ssl => 0, curl => 1 },
-    { ipv6_opt => 0, client_ipv => '',  server_ipv => '4', ssl => 1, curl => 1 },
-    { ipv6_opt => 0, client_ipv => '4', server_ipv => '4', ssl => 0, curl => 1 },
-    { ipv6_opt => 0, client_ipv => '4', server_ipv => '4', ssl => 1, curl => 1 },
-    { ipv6_opt => 0, client_ipv => '6', server_ipv => '6', ssl => 0, curl => 1 },
-    { ipv6_opt => 0, client_ipv => '6', server_ipv => '6', ssl => 1, curl => 1 },
-    { ipv6_opt => 1, client_ipv => '',  server_ipv => '4', ssl => 0, curl => 1 },
-    { ipv6_opt => 1, client_ipv => '',  server_ipv => '4', ssl => 1, curl => 1 },
-    { ipv6_opt => 1, client_ipv => '',  server_ipv => '6', ssl => 0, curl => 1 },
-    { ipv6_opt => 1, client_ipv => '',  server_ipv => '6', ssl => 1, curl => 1 },
-    { ipv6_opt => 1, client_ipv => '4', server_ipv => '4', ssl => 0, curl => 1 },
-    { ipv6_opt => 1, client_ipv => '4', server_ipv => '4', ssl => 1, curl => 1 },
-    { ipv6_opt => 1, client_ipv => '6', server_ipv => '6', ssl => 0, curl => 1 },
-    { ipv6_opt => 1, client_ipv => '6', server_ipv => '6', ssl => 1, curl => 1 },
+    { curl => 0, ipv6_opt => 0, client_ipv => '',  server_ipv => '4', ssl => 0 },
+    { curl => 0, ipv6_opt => 0, client_ipv => '',  server_ipv => '4', ssl => 1 },
+    { curl => 0, ipv6_opt => 0, client_ipv => '4', server_ipv => '4', ssl => 0 },
+    { curl => 0, ipv6_opt => 0, client_ipv => '4', server_ipv => '4', ssl => 1 },
+    { curl => 0, ipv6_opt => 0, client_ipv => '6', server_ipv => '6', ssl => 0 },
+    { curl => 0, ipv6_opt => 0, client_ipv => '6', server_ipv => '6', ssl => 1 },
+    { curl => 0, ipv6_opt => 1, client_ipv => '',  server_ipv => '4', ssl => 0 },
+    { curl => 0, ipv6_opt => 1, client_ipv => '',  server_ipv => '4', ssl => 1 },
+    { curl => 0, ipv6_opt => 1, client_ipv => '',  server_ipv => '6', ssl => 0 },
+    { curl => 0, ipv6_opt => 1, client_ipv => '',  server_ipv => '6', ssl => 1 },
+    { curl => 0, ipv6_opt => 1, client_ipv => '4', server_ipv => '4', ssl => 0 },
+    { curl => 0, ipv6_opt => 1, client_ipv => '4', server_ipv => '4', ssl => 1 },
+    { curl => 0, ipv6_opt => 1, client_ipv => '6', server_ipv => '6', ssl => 0 },
+    { curl => 0, ipv6_opt => 1, client_ipv => '6', server_ipv => '6', ssl => 1 },
+    { curl => 1, ipv6_opt => 0, client_ipv => '',  server_ipv => '4', ssl => 0 },
+    { curl => 1, ipv6_opt => 0, client_ipv => '',  server_ipv => '4', ssl => 1 },
+    { curl => 1, ipv6_opt => 0, client_ipv => '',  server_ipv => '6', ssl => 0 },
+    { curl => 1, ipv6_opt => 0, client_ipv => '',  server_ipv => '6', ssl => 1 },
+    { curl => 1, ipv6_opt => 0, client_ipv => '4', server_ipv => '4', ssl => 0 },
+    { curl => 1, ipv6_opt => 0, client_ipv => '4', server_ipv => '4', ssl => 1 },
+    { curl => 1, ipv6_opt => 0, client_ipv => '6', server_ipv => '6', ssl => 0 },
+    { curl => 1, ipv6_opt => 0, client_ipv => '6', server_ipv => '6', ssl => 1 },
 );
 
 for my $tc (@test_cases) {
+    $tc->{ipv6_opt} //= 0;
+    $tc->{curl} //= 0;
     SKIP: {
         skip("IO::Socket::INET6 not available", 1)
             if ($tc->{ipv6_opt} || $tc->{client_ipv} eq '6') && !$tc->{curl} && !$has_io_socket_inet6;

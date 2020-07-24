@@ -73,6 +73,7 @@ m4_foreach_w([_m], [
     HTTP::Response
     IO::Socket::INET6
     IO::Socket::IP
+    IO::Socket::SSL
     Scalar::Util
     Test::MockModule
     Test::TCP
