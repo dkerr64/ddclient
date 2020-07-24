@@ -24,6 +24,7 @@ use strict;
 use warnings;
 use File::Basename;
 use File::Path qw(make_path);
+use File::Temp;
 use Getopt::Long;
 use IO::Socket::INET;
 use Socket qw(AF_INET AF_INET6 PF_INET PF_INET6);
@@ -2096,7 +2097,6 @@ sub fetch_via_socket_io {
     if ($use_ssl) {
         # IO::Socket::SSL will load IPv6 support if available on the system.
         load_ssl_support;
-        no strict "subs";
         $socket_class = 'IO::Socket::SSL';
         $socket_args{SSL_ca_file} = opt('ssl_ca_file') if defined(opt('ssl_ca_file'));
         $socket_args{SSL_ca_path} = opt('ssl_ca_dir') if defined(opt('ssl_ca_dir'));
@@ -2190,7 +2190,7 @@ sub curl_cmd {
     my @params = @_;
     my $tmpfile;
     my $tfh;
-    my $system_curl = subst_var('@CURL@', '/usr/bin/curl');
+    my $system_curl = quotemeta(subst_var('@CURL@', 'curl'));
     my %curl_codes = (  ## Subset of error codes from https://curl.haxx.se/docs/manpage.html
          2 => "Failed to initialize. (Most likely a bug in ddclient, please open issue at https://github.com/ddclient/ddclient)",
          3 => "URL malformed. The syntax was not correct",
@@ -2210,12 +2210,14 @@ sub curl_cmd {
        127 => "You requested network access with curl but $system_curl was not found",
     );
 
+    debug("CURL: %s", $system_curl);
+    fatal("curl not found") if ($system_curl eq '');
     return '' if (scalar(@params) == 0); ## no parameters provided
 
-    ## Use system File::Temp to generate filename...
-    use File::Temp;
+    # Hard code to /tmp rather than use system TMPDIR to protect from malicious
+    # shell instructions in TMPDIR environment variable.  All systems should have /tmp.
     $tfh = File::Temp->new(DIR => '/tmp',
-                            TEMPLATE => 'ddclient_XXXXXXXXXX');
+                           TEMPLATE => 'ddclient_XXXXXXXXXX');
     $tmpfile = $tfh->filename;
 
     debug("CURL Tempfile: %s", $tmpfile);
@@ -2225,7 +2227,7 @@ sub curl_cmd {
         print($tfh @params);
     }
     close($tfh);
-    my $reply = qx{ $system_curl --config '$tmpfile' 2>/dev/null; };
+    my $reply = qx{ $system_curl --config $tmpfile 2>/dev/null; };
     if ((my $rc = $?>>8) != 0) {
         warning("CURL error (%d) %s", $rc, $curl_codes{$rc} // "Unknown return code. Check $system_curl is installed and its manpage.");
     }
