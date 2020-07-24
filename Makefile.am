@@ -77,8 +77,8 @@ handwritten_tests = \
 	t/parse_assignments.pl \
 	t/write_cache.pl
 generated_tests = \
-	t/version.pl \
-	t/geturl_connectivity.pl
+	t/geturl_connectivity.pl \
+	t/version.pl
 TESTS = $(handwritten_tests) $(generated_tests)
 EXTRA_DIST += $(handwritten_tests) \
 	t/lib/Devel/Autoflush.pm \

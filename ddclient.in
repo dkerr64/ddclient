@@ -2214,11 +2214,11 @@ sub curl_cmd {
 
     ## Use system File::Temp to generate filename...
     use File::Temp;
-    $tfh = File::Temp->new( TMPDIR => "/tmp/",
+    $tfh = File::Temp->new(DIR => '/tmp',
                             TEMPLATE => 'ddclient_XXXXXXXXXX');
     $tmpfile = $tfh->filename;
 
-    debug("CURL Tempfile: %s",$tmpfile);
+    debug("CURL Tempfile: %s", $tmpfile);
     {
         local $\ = "\n";  ## Terminate the file,
         local $, = "\n";  ## and each parameter, with a newline.
