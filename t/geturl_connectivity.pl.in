@@ -81,10 +81,10 @@ my @test_cases = (
     { curl => 1, server_ipv => '6', client_ipv => '6' },
 
     # Fetch with curl and ssl
-    { curl => 1, ssl => 1 , server_ipv => '4', client_ipv => '' },
-    { curl => 1, ssl => 1 , server_ipv => '4', client_ipv => '4' },
-    { curl => 1, ssl => 1 , server_ipv => '6', client_ipv => '' },
-    { curl => 1, ssl => 1 , server_ipv => '6', client_ipv => '6' },
+    { curl => 1, ssl => 1, server_ipv => '4', client_ipv => '' },
+    { curl => 1, ssl => 1, server_ipv => '4', client_ipv => '4' },
+    { curl => 1, ssl => 1, server_ipv => '6', client_ipv => '' },
+    { curl => 1, ssl => 1, server_ipv => '6', client_ipv => '6' },
 );
 
 for my $tc (@test_cases) {
