@@ -43,7 +43,7 @@ sub run_httpd {
     );
     $httpd->run(sub {
         # Echo back the full request.
-        return [ 200, [ 'Content-Type' => 'application/octet-stream' ], [ $_[0]->as_string() ] ];
+        return [200, ['Content-Type' => 'application/octet-stream'], [$_[0]->as_string()]];
     });
     diag(sprintf("started IPv%s%s server running at %s",
                  $ipv6 ? '6' : '4', $ssl ? ' SSL' : '', $httpd->endpoint()));
@@ -51,8 +51,8 @@ sub run_httpd {
 }
 
 my %httpd = (
-    '4' => { 'http' => run_httpd(0, 0), 'https' => run_httpd(0, 1) },
-    '6' => { 'http' => run_httpd(1, 0), 'https' => run_httpd(1, 1) },
+    '4' => {'http' => run_httpd(0, 0), 'https' => run_httpd(0, 1)},
+    '6' => {'http' => run_httpd(1, 0), 'https' => run_httpd(1, 1)},
 );
 
 my @test_cases = (
@@ -101,8 +101,8 @@ for my $tc (@test_cases) {
         skip("HTTP::Daemon::SSL not available", 1) if $tc->{ssl} && !$has_http_daemon_ssl;
         skip("Curl not available on this system", 1) if $tc->{curl} && !$has_curl;
         my $uri = $httpd{$tc->{server_ipv}}{$tc->{ssl} ? 'https' : 'http'}->endpoint();
-        my $name = sprintf("IPv%s client to %s (-%sipv6)%s",
-                           $tc->{client_ipv} || '*', $uri, $tc->{ipv6_opt} ? '' : 'no',
+        my $name = sprintf("IPv%s client to %s%s",
+                           $tc->{client_ipv} || '*', $uri, $tc->{ipv6_opt} ? ' (-ipv6)' : '',
                            $tc->{curl} ? ' (curl)' : '');
         $ddclient::globals{'ipv6'} = $tc->{ipv6_opt};
         $ddclient::globals{'curl'} = $tc->{curl};
