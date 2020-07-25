@@ -2884,7 +2884,7 @@ sub get_ip_from_interface {
         warning("get_ip_from_interface() invalid IP version: %s", $ipver);
         return undef;
     }
-    if (("$ip6type" != "gua") && ("$ip6type" != "ula")) {
+    if (("$ip6type" ne "gua") && ("$ip6type" ne "ula")) {
         warning("get_ip_from_interface() invalid IPv6 type: %s, using type GUA", $ip6type);
         $ip6type = "gua";
     }
@@ -2924,7 +2924,7 @@ sub get_ip_from_interface {
     debug2("Raw IPv6 address information for %s: (%s)\r\n%s", $if, scalar(@reply), join("\n", @reply));
     @reply = grep(!/\bdeprecated\b|\btemporary\b/, @reply); 
     debug2("After removing deprecated and temporary addresses %s: (%s)\r\n%s", $if, scalar(@reply), join("\n", @reply));
-    @reply = ("$ip6type" == "gua") ? grep(/$regex_ipv6_global/, @reply)
+    @reply = ("$ip6type" eq "gua") ? grep(/$regex_ipv6_global/, @reply)
                                    : grep(/(?=F[CD][A-F0-9]{2}:)$regex_ipv6/, @reply);
     debug2("After filtering for %s addresses %s: (%s)\r\n%s", uc($ip6type), $if, scalar(@reply), join("\n", @reply));
 
