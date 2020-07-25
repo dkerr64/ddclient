@@ -74,7 +74,7 @@ handwritten_tests = \
 	t/geturl_ssl.pl \
 	t/is-and-extract-ipv4.pl \
 	t/is-and-extract-ipv6.pl \
-	t/is-and-extract-ipv6-gua.pl \
+	t/is-and-extract-ipv6-global.pl \
 	t/parse_assignments.pl \
 	t/write_cache.pl
 generated_tests = \
