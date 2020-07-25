@@ -403,11 +403,12 @@ my %variables = (
         'if-skip'             => setv(T_STRING,0, 0, '',                   undef),
         'web'                 => setv(T_STRING,0, 0, 'dyndns',             undef),
         'web-skip'            => setv(T_STRING,0, 0, '',                   undef),
+        'web-ssl-validate'    => setv(T_BOOL,  0, 0, 1,                    undef),
         'fw'                  => setv(T_ANY,   0, 0, '',                   undef),
         'fw-skip'             => setv(T_STRING,0, 0, '',                   undef),
         'fw-login'            => setv(T_LOGIN, 0, 0, '',                   undef),
         'fw-password'         => setv(T_PASSWD,0, 0, '',                   undef),
-        'ssl-validate'        => setv(T_BOOL,  0, 0, 1,                    undef),
+        'fw-ssl-validate'     => setv(T_BOOL,  0, 0, 1,                    undef),
         'cmd'                 => setv(T_PROG,  0, 0, '',                   undef),
         'cmd-skip'            => setv(T_STRING,0, 0, '',                   undef),
         'ipv6'                => setv(T_BOOL,  0, 0, 0,                    undef),
@@ -777,8 +778,9 @@ my @opt = (
     [ "ssl",         "!",  "-{no}ssl              : do updates over encrypted SSL connection" ],
     [ "ssl_ca_dir",  "=s", "-ssl_ca_dir           : directory containing certificates of trusted certificate authorities (default: auto-detect)" ],
     [ "ssl_ca_file", "=s", "-ssl_ca_file          : file containing certificates of trusted certificate authorities (default: auto-detect)" ],
-    [ "ssl-validate","!",  "-{no}ssl-validate     : Validate SSL certificate when retrieving IP address from web or firewall (default: yes)" ],
-    [ "curl",        "!",  "-{no}curl             : use cURL for network connections (default nocurl)" ],
+    [ "fw-ssl-validate","!", "-{no}fw-ssl-validate  : Validate SSL certificate when retrieving IP address from firewall" ],
+    [ "web-ssl-validate","!","-{no}web-ssl-validate : Validate SSL certificate when retrieving IP address from web" ],
+    [ "curl",        "!",  "-{no}curl             : use curl for network connections" ],
     [ "retry",       "!",  "-{no}retry            : retry failed updates." ],
     [ "force",       "!",  "-{no}force            : force an update even if the update may be unnecessary" ],
     [ "timeout",     "=i", "-timeout max          : wait at most 'max' seconds for the host to respond" ],
@@ -2386,7 +2388,7 @@ sub get_ip {
             $reply = geturl(
                 proxy => opt('proxy', $h),
                 url => $url,
-                ssl_validate => opt('ssl-validate', $h),
+                ssl_validate => opt('web-ssl-validate', $h),
             ) // '';
         }
 
@@ -2409,7 +2411,7 @@ sub get_ip {
             login => opt('fw-login', $h),
             password => opt('fw-password', $h),
             ignore_ssl_option => 1,
-            ssl_validate => opt('ssl-validate', $h),
+            ssl_validate => opt('fw-ssl-validate', $h),
         ) // '';
         $arg = $url;
 
@@ -2432,7 +2434,7 @@ sub get_ip {
             login => opt('fw-login', $h),
             password => opt('fw-password', $h),
             ignore_ssl_option => 1,
-            ssl_validate => opt('ssl-validate', $h),
+            ssl_validate => opt('fw-ssl-validate', $h),
         ) // '';
         $arg = $url;
 
@@ -2452,7 +2454,7 @@ sub get_ip {
                 login => opt('fw-login', $h),
                 password => opt('fw-password', $h),
                 ignore_ssl_option => 1,
-                ssl_validate => opt('ssl-validate', $h),
+                ssl_validate => opt('fw-ssl-validate', $h),
             ) // '';
         }
     }
