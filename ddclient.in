@@ -2388,15 +2388,15 @@ sub extract_ipv6 {
 ## Regex that matches an IPv6 address that is probably globally routable.
 ## Accepts embedded leading zeros.
 ######################################################################
-my $regex_ipv6_global = qr/
+my $regex_ipv6_global = qr{
     (?!  # Is not one of the following addresses:
-        f[cd][0-9a-f]{2}:   # RFC4193 ULA
-      | fe[89ab][0-9a-f]:   # Linklocal
-      | ff[0-9a-f]{2}:      # Multicast
-      | 0{0,4}:             # Start with zeros
+        f[cd][0-9a-f]{2}:   # fc00::/7 RFC4193 ULA
+      | fe[89ab][0-9a-f]:   # fe80::/10 link local
+      | ff[0-9a-f]{2}:      # ff00::/8 multicast
+      | 0{0,4}:             # ::/16 not globaly routable.
     )
     $regex_ipv6             # And is a valid IPv6 address
-/xi;
+}xi;
 
 ######################################################################
 ## is_ipv6_global() returns true if the string is a valid IPv6 address that is
