@@ -24,6 +24,7 @@ use strict;
 use warnings;
 use File::Basename;
 use File::Path qw(make_path);
+use File::Temp;
 use Getopt::Long;
 use IO::Socket::INET;
 use Socket qw(AF_INET AF_INET6 PF_INET PF_INET6);
@@ -469,6 +470,7 @@ my %variables = (
         'webv4-skip'          => setv(T_STRING,0, 0, '',                   undef),
         'webv6'               => setv(T_STRING,0, 0, undef,	              undef),
         'webv6-skip'          => setv(T_STRING,0, 0, '',                   undef),
+        'web-ssl-validate'    => setv(T_BOOL,  0, 0, 1,                    undef),
         'fw'                  => setv(T_ANY,   0, 0, '',                   undef),
         'fw-skip'             => setv(T_STRING,0, 0, '',                   undef),
         'fwv4'                => setv(T_ANY,   0, 0, '',                   undef),
@@ -477,7 +479,7 @@ my %variables = (
         'fwv6-skip'           => setv(T_STRING,0, 0, '',                   undef),
         'fw-login'            => setv(T_LOGIN, 0, 0, '',                   undef),
         'fw-password'         => setv(T_PASSWD,0, 0, '',                   undef),
-        'ssl-validate'        => setv(T_BOOL,  0, 0, 1,                    undef),
+        'fw-ssl-validate'     => setv(T_BOOL,  0, 0, 1,                    undef),
         'cmd'                 => setv(T_PROG,  0, 0, '',                   undef),
         'cmd-skip'            => setv(T_STRING,0, 0, '',                   undef),
         'cmdv4'               => setv(T_PROG,  0, 0, '',                   undef),
@@ -881,8 +883,9 @@ my @opt = (
     [ "curl",        "!",  "-{no}curl             : use cURL for network connections (default nocurl)" ],
     [ "ssl_ca_dir",  "=s", "-ssl_ca_dir           : directory containing certificates of trusted certificate authorities (default: auto-detect)" ],
     [ "ssl_ca_file", "=s", "-ssl_ca_file          : file containing certificates of trusted certificate authorities (default: auto-detect)" ],
-    [ "ssl-validate","!",  "-{no}ssl-validate     : Validate SSL certificate when retrieving IP address from web or firewall (default: yes)" ],
-    [ "curl",        "!",  "-{no}curl             : use cURL for network connections (default nocurl)" ],
+    [ "fw-ssl-validate","!", "-{no}fw-ssl-validate  : Validate SSL certificate when retrieving IP address from firewall" ],
+    [ "web-ssl-validate","!","-{no}web-ssl-validate : Validate SSL certificate when retrieving IP address from web" ],
+    [ "curl",        "!",  "-{no}curl             : use curl for network connections" ],
     [ "retry",       "!",  "-{no}retry            : retry failed updates." ],
     [ "force",       "!",  "-{no}force            : force an update even if the update may be unnecessary" ],
     [ "timeout",     "=i", "-timeout max          : wait at most 'max' seconds for the host to respond" ],
@@ -2325,7 +2328,6 @@ sub fetch_via_socket_io {
     if ($use_ssl) {
         # IO::Socket::SSL will load IPv6 support if available on the system.
         load_ssl_support;
-        no strict "subs";
         $socket_class = 'IO::Socket::SSL';
         $socket_args{SSL_ca_file} = opt('ssl_ca_file') if defined(opt('ssl_ca_file'));
         $socket_args{SSL_ca_path} = opt('ssl_ca_dir') if defined(opt('ssl_ca_dir'));
@@ -2419,7 +2421,7 @@ sub curl_cmd {
     my @params = @_;
     my $tmpfile;
     my $tfh;
-    my $system_curl = subst_var('@CURL@', '/usr/bin/curl');
+    my $system_curl = quotemeta(subst_var('@CURL@', 'curl'));
     my %curl_codes = (  ## Subset of error codes from https://curl.haxx.se/docs/manpage.html
          2 => "Failed to initialize. (Most likely a bug in ddclient, please open issue at https://github.com/ddclient/ddclient)",
          3 => "URL malformed. The syntax was not correct",
@@ -2439,22 +2441,24 @@ sub curl_cmd {
        127 => "You requested network access with curl but $system_curl was not found",
     );
 
+    debug("CURL: %s", $system_curl);
+    fatal("curl not found") if ($system_curl eq '');
     return '' if (scalar(@params) == 0); ## no parameters provided
 
-    ## Use system File::Temp to generate filename...
-    use File::Temp;
-    $tfh = File::Temp->new( TMPDIR => "/tmp/",
-                            TEMPLATE => 'ddclient_XXXXXXXXXX');
+    # Hard code to /tmp rather than use system TMPDIR to protect from malicious
+    # shell instructions in TMPDIR environment variable.  All systems should have /tmp.
+    $tfh = File::Temp->new(DIR => '/tmp',
+                           TEMPLATE => 'ddclient_XXXXXXXXXX');
     $tmpfile = $tfh->filename;
 
-    debug("CURL Tempfile: %s",$tmpfile);
+    debug("CURL Tempfile: %s", $tmpfile);
     {
         local $\ = "\n";  ## Terminate the file,
         local $, = "\n";  ## and each parameter, with a newline.
         print($tfh @params);
     }
     close($tfh);
-    my $reply = qx{ $system_curl --config '$tmpfile' 2>/dev/null; };
+    my $reply = qx{ $system_curl --config $tmpfile 2>/dev/null; };
     if ((my $rc = $?>>8) != 0) {
         warning("CURL error (%d) %s", $rc, $curl_codes{$rc} // "Unknown return code. Check $system_curl is installed and its manpage.");
     }
@@ -2613,7 +2617,7 @@ sub get_ip {
             $reply = geturl(
                 proxy => opt('proxy', $h),
                 url => $url,
-                ssl_validate => opt('ssl-validate', $h),
+                ssl_validate => opt('web-ssl-validate', $h),
             ) // '';
         }
 
@@ -2636,7 +2640,7 @@ sub get_ip {
             login => opt('fw-login', $h),
             password => opt('fw-password', $h),
             ignore_ssl_option => 1,
-            ssl_validate => opt('ssl-validate', $h),
+            ssl_validate => opt('fw-ssl-validate', $h),
         ) // '';
         $arg = $url;
 
@@ -2659,7 +2663,7 @@ sub get_ip {
             login => opt('fw-login', $h),
             password => opt('fw-password', $h),
             ignore_ssl_option => 1,
-            ssl_validate => opt('ssl-validate', $h),
+            ssl_validate => opt('fw-ssl-validate', $h),
         ) // '';
         $arg = $url;
 
@@ -2679,7 +2683,7 @@ sub get_ip {
                 login => opt('fw-login', $h),
                 password => opt('fw-password', $h),
                 ignore_ssl_option => 1,
-                ssl_validate => opt('ssl-validate', $h),
+                ssl_validate => opt('fw-ssl-validate', $h),
             ) // '';
         }
     }

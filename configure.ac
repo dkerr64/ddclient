@@ -73,6 +73,7 @@ m4_foreach_w([_m], [
     HTTP::Response
     IO::Socket::INET6
     IO::Socket::IP
+    IO::Socket::SSL
     Scalar::Util
     Test::MockModule
     Test::TCP
@@ -84,7 +85,7 @@ m4_foreach_w([_m], [
 
 AC_CONFIG_FILES([
     Makefile
-    t/version.pl
     t/geturl_connectivity.pl
+    t/version.pl
   ])
 AC_OUTPUT
