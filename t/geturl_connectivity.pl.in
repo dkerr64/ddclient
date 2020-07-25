@@ -101,7 +101,7 @@ for my $tc (@test_cases) {
         skip("HTTP::Daemon::SSL not available", 1) if $tc->{ssl} && !$has_http_daemon_ssl;
         skip("Curl not available on this system", 1) if $tc->{curl} && !$has_curl;
         my $uri = $httpd{$tc->{server_ipv}}{$tc->{ssl} ? 'https' : 'http'}->endpoint();
-        my $name = sprintf("IPv%s client to %s%s",
+        my $name = sprintf("IPv%s client to %s%s%s",
                            $tc->{client_ipv} || '*', $uri, $tc->{ipv6_opt} ? ' (-ipv6)' : '',
                            $tc->{curl} ? ' (curl)' : '');
         $ddclient::globals{'ipv6'} = $tc->{ipv6_opt};
