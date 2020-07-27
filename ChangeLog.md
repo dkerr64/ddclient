@@ -13,13 +13,19 @@ repository history](https://github.com/ddclient/ddclient/commits/master).
   * Added support for Gandi LiveDNS.
   * Added a build system to make it easier for distributions to package
     ddclient:
-
-        ./autogen && ./configure && make && make VERBOSE=1 check && make install
-
+    ```
+    ./autogen && ./configure && make && make VERBOSE=1 check && make install
+    ```
   * The `freedns` protocol (for https://freedns.afraid.org) now supports IPv6
     addresses.
   * New `ssl_ca_dir` and `ssl_ca_file` options to specify the location of CA
     certificates.
+  * New built-in shorthands for obtaining the IP address from the following
+    devices ([thanks to Geoff Simmons](https://bugs.debian.org/589980)):
+      - `alcatel-530`: Alcatel/Thomson SpeedTouch 530
+      - `siemens-ss4200`: Siemens SpeedStream 4200
+      - `thomson-st536v6`: Thomson SpeedTouch 536v6
+      - `thomson-tg782`: Thomson/Technicolor TG782
   * Added option `-curl` to access network with system Curl command instead
     of the Perl built-in IO::Socket classes.
   * Added option `-{no}web-ssl-validate` and `-{no}fw-ssl-validate`to provide
