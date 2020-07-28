@@ -2851,7 +2851,7 @@ sub extract_ipv6_global {
 ## Regex that matches an IPv6 address that is unique local (ULA).
 ## Accepts embedded leading zeros.
 ######################################################################
-my $regex_ipv6_local = qr{
+my $regex_ipv6_ula = qr{
     (?=  # Address starts with
       f[cd][0-9a-f]{2}:     # fc00::/7 RFC4193 ULA
     )
@@ -2949,7 +2949,7 @@ sub get_ip_from_interface {
     @reply = grep(!/\bdeprecated\b|\btemporary\b/, @reply); 
     debug2("After removing deprecated and temporary addresses %s: (%s)\r\n%s", $interface, scalar(@reply), join("\n", @reply));
     @reply = ("$ip6type" eq "global") ? grep(/$regex_ipv6_global/, @reply)
-                                      : grep(/$regex_ipv6_local/, @reply);
+                                      : grep(/$regex_ipv6_ula/, @reply);
     debug2("After filtering for %s addresses %s: (%s)\r\n%s", uc($ip6type), $interface, scalar(@reply), join("\n", @reply));
 
     ## If we filter down to zero or one result then we are done...
