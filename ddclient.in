@@ -426,8 +426,8 @@ my %variables = (
         'ipv4'                => setv(T_IPV4,  0, 0, undef,                undef),
         'ipv6'                => setv(T_IPV6,  0, 0, undef,                undef),
         'if'                  => setv(T_IF,    0, 0, 'ppp0',               undef),
-        'ifv4'                => setv(T_IF,    0, 0, undef,                undef),
-        'ifv6'                => setv(T_IF,    0, 0, undef,                undef),
+        'ifv4'                => setv(T_IF,    0, 0, 'default',            undef),
+        'ifv6'                => setv(T_IF,    0, 0, 'default',            undef),
         'if-skip'             => setv(T_STRING,1, 0, '',                   undef),
         'web'                 => setv(T_STRING,0, 0, 'dyndns',             undef),
         'web-skip'            => setv(T_STRING,1, 0, '',                   undef),
@@ -2848,6 +2848,17 @@ sub extract_ipv6_global {
 }
 
 ######################################################################
+## Regex that matches an IPv6 address that is unique local (ULA).
+## Accepts embedded leading zeros.
+######################################################################
+my $regex_ipv6_local = qr{
+    (?=  # Address starts with
+      f[cd][0-9a-f]{2}:     # fc00::/7 RFC4193 ULA
+    )
+    $regex_ipv6             # And is a valid IPv6 address
+}xi;
+
+######################################################################
 ## get_default_interface finds the default network interface based on
 ## the IP routing table on the system.
 ######################################################################
@@ -2877,8 +2888,8 @@ sub get_default_interface {
 
     my @list = split(/\n/, $reply);
     @list = grep(!/\blo\b/, @list);    ## Filter out loopback interface
-    @list = ($ipver == 4) ? grep(/^(?:default|(?:(?:0\.){3}0))/, @list)
-                          : grep(/^default|::\/0/, @list);
+    @list = ($ipver == 4) ? grep(/^default|^(?:0\.){3}0/, @list)    # IPv4 'default' or '0.0.0.0'
+                          : grep(/^default|^::\/0/, @list);         # IPv6 'default' or '::/0'
     return undef if (($count = scalar(@list)) == 0);
     ## interface will be the last word in the line. Must accept blank spaces at the end.
     return ($list[0] =~ /\b(\w+)\s*$/)[0] if ($count == 1);
@@ -2893,9 +2904,9 @@ sub get_default_interface {
 ## interface. Defaults to IPv4 unless '6' passed as 2nd parameter.
 ######################################################################
 sub get_ip_from_interface {
-    my $if = shift // "default";
+    my $interface = shift // "default";
     my $ipver = shift // 4;   ## Defaults to IPv4 if not specified
-    my $ip6type = lc(shift // "gua"); ## either "gua" or "ula"
+    my $ip6type = lc(shift // "global"); ## either "global" or "local"
     my $reply = shift // '';  ## Pass in data for unit testing purposes only
     my $MacOS = shift // 0;   ## For testing can set to 1 if input data is MacOS format
     my $count = 0;
@@ -2904,49 +2915,49 @@ sub get_ip_from_interface {
         warning("get_ip_from_interface() invalid IP version: %s", $ipver);
         return undef;
     }
-    if (("$ip6type" ne "gua") && ("$ip6type" ne "ula")) {
-        warning("get_ip_from_interface() invalid IPv6 type: %s, using type GUA", $ip6type);
-        $ip6type = "gua";
+    if (("$ip6type" ne "global") && ("$ip6type" ne "local")) {
+        warning("get_ip_from_interface() invalid IPv6 type: %s, using type global", $ip6type);
+        $ip6type = "global";
     }
 
-    $if = get_default_interface($ipver) if (lc($if) eq "default");
-    return undef if !defined($if);
+    $interface = get_default_interface($ipver) if (lc($interface) eq "default");
+    return undef if !defined($interface);
 
     if ($ipver == 4) {
         if ($reply eq '') { ## skip if test data passed in.
             ## Try ip first, then ifconfig.
-            $reply = qx{ ip -4 -o addr show dev $if scope global 2>/dev/null };
-            $reply = qx{ ifconfig $if 2>/dev/null } if $?;
-            failed("Unable to obtain information for '%s' -- missing ip or ifconfig commands?", $if) if $?;
+            $reply = qx{ ip -4 -o addr show dev $interface scope global 2>/dev/null };
+            $reply = qx{ ifconfig $interface 2>/dev/null } if $?;
+            failed("Unable to obtain information for '%s' -- missing ip or ifconfig commands?", $interface) if $?;
         }
 
         ## IPv4 is simple, we just need to find the first IPv4 address returned in the list.
         my @reply = split(/\n/, $reply);
         @reply = grep(/\binet\b/, @reply);
-        debug2("Raw IPv4 address information for %s: (%s)\r\n%s", $if, scalar(@reply), join("\n", @reply));
+        debug2("Raw IPv4 address information for %s: (%s)\r\n%s", $interface, scalar(@reply), join("\n", @reply));
         return extract_ipv4($reply[0]);
     }
 
     ## From this point on we only looking for IPv6 address.
     if ($reply eq '') { ## skip if test data passed in.
         ## Try ip first, then ifconfig with -L for MacOS then finally ifconfig for everything else
-        $reply = qx{ip -6 -o addr show dev $if scope global 2>/dev/null};  # Linux
-      (($reply = qx{ifconfig -L $if 2>/dev/null}) && ($MacOS = 1)) if $?;  # MacOS
-        $reply = qx{ifconfig $if 2>/dev/null} if $?;                       # Any without iproute2
-        failed("Unable to obtain information for '%s' -- missing ip or ifconfig commands?", $if) if $?;
+        $reply = qx{ip -6 -o addr show dev $interface scope global 2>/dev/null};  # Linux
+      (($reply = qx{ifconfig -L $interface 2>/dev/null}) && ($MacOS = 1)) if $?;  # MacOS
+        $reply = qx{ifconfig $interface 2>/dev/null} if $?;                       # Any without iproute2
+        failed("Unable to obtain information for '%s' -- missing ip or ifconfig commands?", $interface) if $?;
         debug("Detected we're probably running on MacOS") if ($MacOS == 1);
     }
 
     ## IPv6 is more complex than IPv4.  Start by filtering on only "inet6" addresses
-    ## Then remove depreciated or temporary addresses and finally on GUA addresses 
+    ## Then remove depreciated or temporary addresses and finally on global or local addresses 
     my @reply = split(/\n/, $reply);
     @reply = grep(/\binet6\b/, @reply);
-    debug2("Raw IPv6 address information for %s: (%s)\r\n%s", $if, scalar(@reply), join("\n", @reply));
+    debug2("Raw IPv6 address information for %s: (%s)\r\n%s", $interface, scalar(@reply), join("\n", @reply));
     @reply = grep(!/\bdeprecated\b|\btemporary\b/, @reply); 
-    debug2("After removing deprecated and temporary addresses %s: (%s)\r\n%s", $if, scalar(@reply), join("\n", @reply));
-    @reply = ("$ip6type" eq "gua") ? grep(/$regex_ipv6_global/, @reply)
-                                   : grep(/(?=F[CD][A-F0-9]{2}:)$regex_ipv6/, @reply);
-    debug2("After filtering for %s addresses %s: (%s)\r\n%s", uc($ip6type), $if, scalar(@reply), join("\n", @reply));
+    debug2("After removing deprecated and temporary addresses %s: (%s)\r\n%s", $interface, scalar(@reply), join("\n", @reply));
+    @reply = ("$ip6type" eq "global") ? grep(/$regex_ipv6_global/, @reply)
+                                      : grep(/$regex_ipv6_local/, @reply);
+    debug2("After filtering for %s addresses %s: (%s)\r\n%s", uc($ip6type), $interface, scalar(@reply), join("\n", @reply));
 
     ## If we filter down to zero or one result then we are done...
     return undef if (($count = scalar(@reply)) == 0);
@@ -2954,10 +2965,10 @@ sub get_ip_from_interface {
 
     ## If there are more than one we need to select the "best".
     ## First choice would be a static address.
-    my @static = ($MacOS == 1) ? grep(!/^.*\bvltime\b.*$/i, @reply)
-                               : grep(/^.*\bvalid_lft.\bforever\b.*$/i, @reply);
+    my @static = ($MacOS == 1) ? grep(!/^.*\bvltime\b.*$/i, @reply)              # MacOS, no 'vltime'
+                               : grep(/^.*\bvalid_lft.\bforever\b.*$/i, @reply); # Everything else 'forever' life
     $count = scalar(@static);
-    debug2("Possible Static IP addresses %s: (%s)\r\n%s", $if, $count, join("\n", @static));
+    debug2("Possible Static IP addresses %s: (%s)\r\n%s", $interface, $count, join("\n", @static));
 
     ## If only one result then we are done.  If there are more than one static addresses
     ## then we will replace our original list with the list of statics and sort on them.
@@ -2976,7 +2987,7 @@ sub get_ip_from_interface {
         ## Finally we sort by remaining valid lifetime (only works with iproute2 or MacOS)
      || (($b =~ /(?:\bvalid_lft\b\s*|\bvltime\b\s*)(\d+)/i)[0] // 0) <=> (($a =~ /(?:\bvalid_lft\b\s*|\bvltime\b\s*)(\d+)/i)[0] // 0)
     } @reply;
-    debug2("Sorted list of IP addresss for %s: (%s)\r\n%s", $if, scalar(@sorted), join("\n", @sorted));
+    debug2("Sorted list of IP addresss for %s: (%s)\r\n%s", $interface, scalar(@sorted), join("\n", @sorted));
 
     ## Whatever sorted to the top is the "best" choice for IPv6 address
     return extract_ipv6($sorted[0]);
