@@ -2865,13 +2865,13 @@ my $regex_ipv6_local = qr{
 sub get_default_interface {
     my $ipver = shift // 4;
     my $ipstr = ($ipver == 6) ? 'inet6' : 'inet';
-    my $reply = '';
+    my $reply = shift // '';  ## Pass in data for unit testing purposes only
     my $count = 0;
 
     return undef if (($ipver != 4) && ($ipver != 6));
 
     ## Best option is the ip command from iproute2 package
-    $reply = qx{ ip -$ipver -o route list match default 2>/dev/null };
+    $reply = qx{ ip -$ipver -o route list match default 2>/dev/null } if ($reply eq ''); ## skip if test data passed in.
     if (!$?) {
         debug2("Raw 'ip route list match default' information for IPv%s:\n%s", $ipver, $reply);
         ## There should be no ambiguity using iproute2...
@@ -2879,10 +2879,11 @@ sub get_default_interface {
     }
 
     ## Fallback is the netstat command.  This is only option on MacOS.
-    $reply = qx{ netstat -rn -$ipver 2>/dev/null };         # Linux
-    $reply = qx{ netstat -rn -f $ipstr 2>/dev/null } if $?; # MacOS
-    $reply = qx{ netstat -rn 2>/dev/null } if $?;           # Busybox (IPv4 only)
-
+    if ($reply eq '') { ## skip if test data passed in.
+        $reply = qx{ netstat -rn -$ipver 2>/dev/null };         # Linux
+        $reply = qx{ netstat -rn -f $ipstr 2>/dev/null } if $?; # MacOS
+        $reply = qx{ netstat -rn 2>/dev/null } if $?;           # Busybox (IPv4 only)
+    }
     failed("Unable to obtain default route information -- missing ip or natstat commands?") if $?;
     debug2("Raw 'netstat -rn' route information for IPv%s:\n%s", $ipver, $reply);
 
