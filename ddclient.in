@@ -2866,38 +2866,30 @@ sub get_default_interface {
     my $ipver = shift // 4;
     my $ipstr = ($ipver == 6) ? 'inet6' : 'inet';
     my $reply = shift // '';  ## Pass in data for unit testing purposes only
-    my $count = 0;
 
     return undef if (($ipver != 4) && ($ipver != 6));
 
-    ## Best option is the ip command from iproute2 package
-    $reply = qx{ ip -$ipver -o route list match default 2>/dev/null } if ($reply eq ''); ## skip if test data passed in.
-    if (!$?) {
-        debug2("Raw 'ip route list match default' information for IPv%s:\n%s", $ipver, $reply);
-        ## There should be no ambiguity using iproute2...
-        return ($reply =~ /(?<=\bdev\W)(\w+)/)[0];
-    }
-
-    ## Fallback is the netstat command.  This is only option on MacOS.
     if ($reply eq '') { ## skip if test data passed in.
-        $reply = qx{ netstat -rn -$ipver 2>/dev/null };         # Linux
+        ## Best option is the ip command from iproute2 package
+        $reply = qx{ ip -$ipver -o route list match default 2>/dev/null };
+        ## Fallback is the netstat command. This is only option on MacOS.
+        $reply = qx{ netstat -rn -$ipver 2>/dev/null } if $?;   # Linux
         $reply = qx{ netstat -rn -f $ipstr 2>/dev/null } if $?; # MacOS
-        $reply = qx{ netstat -rn 2>/dev/null } if $?;           # Busybox (IPv4 only)
+        $reply = qx{ netstat -rn 2>/dev/null } if $?;           # Busybox
     }
     failed("Unable to obtain default route information -- missing ip or natstat commands?") if $?;
-    debug2("Raw 'netstat -rn' route information for IPv%s:\n%s", $ipver, $reply);
+    debug2("Raw ip route or netstat information for IPv%s:\n%s", $ipver, $reply);
 
     my @list = split(/\n/, $reply);
-    @list = grep(!/\blo\b/, @list);    ## Filter out loopback interface
-    @list = ($ipver == 4) ? grep(/^default|^(?:0\.){3}0/, @list)    # IPv4 'default' or '0.0.0.0'
-                          : grep(/^default|^::\/0/, @list);         # IPv6 'default' or '::/0'
-    return undef if (($count = scalar(@list)) == 0);
-    ## interface will be the last word in the line. Must accept blank spaces at the end.
-    return ($list[0] =~ /\b(\w+)\s*$/)[0] if ($count == 1);
-    ## if we have more than one default route we're going to select the first
-    ## in the list as that is most likely the route that the OS will select.
-    debug("Multiple default routes found for IPv%s using first in list:\n%s", $ipver, $list[0]);
-    return ($list[0] =~ /\b(\w+)\s*$/)[0];
+    @list = grep(!/\blo\b/, @list);                      # Remove loopback interface
+    @list = grep(/^default|^(?:0\.){3}0|^::\/0/, @list); # Select 'default' or '0.0.0.0' or '::/0'
+    return undef if (scalar(@list) == 0);
+
+    ## Interface will be after "dev" or the last word in the line. Must accept blank spaces
+    ## at the end. If we have more than one default route we're going to select the first.
+    debug("Default routes found for IPv%s - using first in list:\n%s", $ipver, join("\n",@list));
+    $list[0] =~ /\bdev\b\s*\K[^\s\/]+|\b[^\s\/]+(?=[\s\/]*$)/;
+    return($&);
 }
 
 ######################################################################
