@@ -2899,7 +2899,7 @@ sub get_default_interface {
 sub get_ip_from_interface {
     my $interface = shift // "default";
     my $ipver = shift // 4;   ## Defaults to IPv4 if not specified
-    my $ip6type = lc(shift // "global"); ## either "global" or "local"
+    my $scope = lc(shift // "gua"); ## either "gua" or "ula"
     my $reply = shift // '';  ## Pass in data for unit testing purposes only
     my $MacOS = shift // 0;   ## For testing can set to 1 if input data is MacOS format
     my $count = 0;
@@ -2908,13 +2908,15 @@ sub get_ip_from_interface {
         warning("get_ip_from_interface() invalid IP version: %s", $ipver);
         return undef;
     }
-    if (("$ip6type" ne "global") && ("$ip6type" ne "local")) {
-        warning("get_ip_from_interface() invalid IPv6 type: %s, using type global", $ip6type);
-        $ip6type = "global";
+    if (("$scope" ne "gua") && ("$scope" ne "ula")) {
+        warning("get_ip_from_interface() invalid IPv6 type: %s, using type global", $scope);
+        $scope = "gua";
     }
 
-    $interface = get_default_interface($ipver) if (lc($interface) eq "default");
-    return undef if !defined($interface);
+    if ($reply eq '') { ## skip if test data passed in.
+        $interface = get_default_interface($ipver) if (lc($interface) eq "default");
+        return undef if !defined($interface);
+    }
 
     if ($ipver == 4) {
         if ($reply eq '') { ## skip if test data passed in.
@@ -2927,7 +2929,7 @@ sub get_ip_from_interface {
         ## IPv4 is simple, we just need to find the first IPv4 address returned in the list.
         my @reply = split(/\n/, $reply);
         @reply = grep(/\binet\b/, @reply);
-        debug2("Raw IPv4 address information for %s: (%s)\r\n%s", $interface, scalar(@reply), join("\n", @reply));
+        debug("Raw IPv4 address information for %s: (%s)\r\n%s", $interface, scalar(@reply), join("\n", @reply));
         return extract_ipv4($reply[0]);
     }
 
@@ -2945,12 +2947,11 @@ sub get_ip_from_interface {
     ## Then remove depreciated or temporary addresses and finally on global or local addresses 
     my @reply = split(/\n/, $reply);
     @reply = grep(/\binet6\b/, @reply);
-    debug2("Raw IPv6 address information for %s: (%s)\r\n%s", $interface, scalar(@reply), join("\n", @reply));
+    debug("Raw IPv6 address information for %s: (%s)\r\n%s", $interface, scalar(@reply), join("\n", @reply));
     @reply = grep(!/\bdeprecated\b|\btemporary\b/, @reply); 
-    debug2("After removing deprecated and temporary addresses %s: (%s)\r\n%s", $interface, scalar(@reply), join("\n", @reply));
-    @reply = ("$ip6type" eq "global") ? grep(/$regex_ipv6_global/, @reply)
-                                      : grep(/$regex_ipv6_ula/, @reply);
-    debug2("After filtering for %s addresses %s: (%s)\r\n%s", uc($ip6type), $interface, scalar(@reply), join("\n", @reply));
+    @reply = ("$scope" eq "gua") ? grep(/$regex_ipv6_global/, @reply)
+                                 : grep(/$regex_ipv6_ula/, @reply);
+    debug("Raw IPv6 after filtering for %s addresses %s: (%s)\r\n%s", uc($scope), $interface, scalar(@reply), join("\n", @reply));
 
     ## If we filter down to zero or one result then we are done...
     return undef if (($count = scalar(@reply)) == 0);
@@ -2961,7 +2962,7 @@ sub get_ip_from_interface {
     my @static = ($MacOS == 1) ? grep(!/^.*\bvltime\b.*$/i, @reply)              # MacOS, no 'vltime'
                                : grep(/^.*\bvalid_lft.\bforever\b.*$/i, @reply); # Everything else 'forever' life
     $count = scalar(@static);
-    debug2("Possible Static IP addresses %s: (%s)\r\n%s", $interface, $count, join("\n", @static));
+    debug("Possible Static IP addresses %s: (%s)\r\n%s", $interface, $count, join("\n", @static));
 
     ## If only one result then we are done.  If there are more than one static addresses
     ## then we will replace our original list with the list of statics and sort on them.
@@ -2980,7 +2981,7 @@ sub get_ip_from_interface {
         ## Finally we sort by remaining valid lifetime (only works with iproute2 or MacOS)
      || (($b =~ /(?:\bvalid_lft\b\s*|\bvltime\b\s*)(\d+)/i)[0] // 0) <=> (($a =~ /(?:\bvalid_lft\b\s*|\bvltime\b\s*)(\d+)/i)[0] // 0)
     } @reply;
-    debug2("Sorted list of IP addresss for %s: (%s)\r\n%s", $interface, scalar(@sorted), join("\n", @sorted));
+    debug("Sorted list of IP addresss for %s: (%s)\r\n%s", $interface, scalar(@sorted), join("\n", @sorted));
 
     ## Whatever sorted to the top is the "best" choice for IPv6 address
     return extract_ipv6($sorted[0]);
