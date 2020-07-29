@@ -6,8 +6,8 @@ eval { require 'ddclient'; } or BAIL_OUT($@);
 
 # To aid in debugging, uncomment the following lines. (They are normally left commented to avoid
 # accidentally interfering with the Test Anything Protocol messages written by Test::More.)
-STDOUT->autoflush(1);
-$ddclient::globals{'debug'} = 1;
+#STDOUT->autoflush(1);
+#$ddclient::globals{'debug'} = 1;
 
 my @default_if_tests = (
     # Outputs from ip route and netstat commands to find default route (and therefore interface)
