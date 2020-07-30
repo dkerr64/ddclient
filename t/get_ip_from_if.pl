@@ -435,7 +435,7 @@ EOF
     {   name => "ifconfig -L en0 (MacOS autoconf IPv6)",
         ipver => 6,
         scope => undef,
-        MaxOS => 1,
+        MacOS => 1,
         want => "2001:db8:450a:e723:1c99:99e2:21d0:79e6",
         text => <<EOF, },
 en0: flags=8963<UP,BROADCAST,SMART,RUNNING,PROMISC,SIMPLEX,MULTICAST> mtu 9000
@@ -457,7 +457,7 @@ EOF
     {   name => "ifconfig -L en0 (MacOS static IPv6)",
         ipver => 6,
         scope => undef,
-        MaxOS => 1,
+        MacOS => 1,
         want => "2001:db8:450a:e723::100",
         text => <<EOF, },
 en1: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
@@ -473,7 +473,7 @@ EOF
     {   name => "ifconfig -L em0 (FreeBSD autoconf IPv6)",
         ipver => 6,
         scope => undef,
-        MaxOS => 1,
+        MacOS => 1,
         want => "2001:db8:450a:e723:20c:29ff:fe9f:c532",
         text => <<EOF, },
 em0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> metric 0 mtu 1500

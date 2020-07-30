@@ -2958,7 +2958,7 @@ sub get_ip_from_interface {
 
     ## If there are more than one we need to select the "best".
     ## First choice would be a static address.
-    my @static = ($MacOS == 1) ? grep(!/^.*\bvltime\b.*$/i, @reply)              # MacOS, no 'vltime'
+    my @static = ($MacOS == 1) ? grep(!/^.*\bvltime\b.*$/i, @reply)              # MacOS or FreeBSD, no 'vltime'
                                : grep(/^.*\bvalid_lft.\bforever\b.*$/i, @reply); # Everything else 'forever' life
     $count = scalar(@static);
     debug("Possible Static IP addresses %s: (%s)\r\n%s", $interface, $count, join("\n", @static));
