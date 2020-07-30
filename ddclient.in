@@ -2873,7 +2873,7 @@ sub get_default_interface {
         ## Best option is the ip command from iproute2 package
         $reply = qx{ ip -$ipver -o route list match default 2>/dev/null };
         ## Fallback is the netstat command. This is only option on MacOS.
-        $reply = qx{ netstat -rn -$ipver 2>/dev/null } if $?;   # Linux
+        $reply = qx{ netstat -rn -$ipver 2>/dev/null } if $?;   # Linux, FreeBSD
         $reply = qx{ netstat -rn -f $ipstr 2>/dev/null } if $?; # MacOS
         $reply = qx{ netstat -rn 2>/dev/null } if $?;           # Busybox
     }
@@ -2881,7 +2881,6 @@ sub get_default_interface {
     debug2("Raw ip route or netstat information for IPv%s:\n%s", $ipver, $reply);
 
     my @list = split(/\n/, $reply);
-    @list = grep(!/\blo\b/, @list);                      # Remove loopback interface
     @list = grep(/^default|^(?:0\.){3}0|^::\/0/, @list); # Select 'default' or '0.0.0.0' or '::/0'
     return undef if (scalar(@list) == 0);
 
@@ -2937,7 +2936,7 @@ sub get_ip_from_interface {
     if ($reply eq '') { ## skip if test data passed in.
         ## Try ip first, then ifconfig with -L for MacOS then finally ifconfig for everything else
         $reply = qx{ip -6 -o addr show dev $interface scope global 2>/dev/null};  # Linux
-      (($reply = qx{ifconfig -L $interface 2>/dev/null}) && ($MacOS = 1)) if $?;  # MacOS
+      (($reply = qx{ifconfig -L $interface 2>/dev/null}) && ($MacOS = 1)) if $?;  # MacOS, FreeBSD
         $reply = qx{ifconfig $interface 2>/dev/null} if $?;                       # Any without iproute2
         failed("Unable to obtain information for '%s' -- missing ip or ifconfig commands?", $interface) if $?;
         debug("Detected we're probably running on MacOS") if ($MacOS == 1);

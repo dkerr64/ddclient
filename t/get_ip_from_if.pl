@@ -47,6 +47,42 @@ Destination     Gateway         Genmask         Flags   MSS Window  irtt Iface
 169.254.0.0     0.0.0.0         255.255.0.0     U         0 0          0 ens33
 192.168.100.0    0.0.0.0         255.255.255.0   U         0 0          0 ens33
 EOF
+    {   name => "netstat -rn -4 (FreeBSD)",
+        ipver => 4,
+        want => "em0",
+        text => <<EOF, },
+Routing tables
+
+Internet:
+Destination        Gateway            Flags     Netif Expire
+default            192.168.100.1       UGS         em0
+127.0.0.1          link#2             UH          lo0
+192.168.100.0/24    link#1             U           em0
+192.168.100.207     link#1             UHS         lo0
+EOF
+    {   name => "netstat -rn -6 (FreeBSD)",
+        ipver => 6,
+        want => "em0",
+        text => <<EOF, },
+Routing tables
+
+Internet6:
+Destination                       Gateway                       Flags     Netif Expire
+::/96                             ::1                           UGRS        lo0
+default                           fe80::4262:31ff:fe08:60b3%em0 UG          em0
+::1                               link#2                        UH          lo0
+::ffff:0.0.0.0/96                 ::1                           UGRS        lo0
+2001:db8:450a:e723::/64           link#1                        U           em0
+2001:db8:450a:e723:20c:29ff:fe9f:c532 link#1                    UHS         lo0
+fdb6:1d86:d9bd:3::/64             link#1                        U           em0
+fdb6:1d86:d9bd:3:20c:29ff:fe9f:c532 link#1                      UHS         lo0
+fe80::/10                         ::1                           UGRS        lo0
+fe80::%em0/64                     link#1                        U           em0
+fe80::20c:29ff:fe9f:c532%em0      link#1                        UHS         lo0
+fe80::%lo0/64                     link#2                        U           lo0
+fe80::1%lo0                       link#2                        UHS         lo0
+ff02::/16                         ::1                           UGRS        lo0
+EOF
     {   name => "netstat -rn -6 (most linux)",
         ipver => 6,
         want => "ens33",
@@ -380,6 +416,22 @@ en0: flags=8963<UP,BROADCAST,SMART,RUNNING,PROMISC,SIMPLEX,MULTICAST> mtu 9000
 	media: 1000baseT <full-duplex,flow-control,energy-efficient-ethernet>
 	status: active
 EOF
+    {   name => "ifconfig em0 (FreeBSD IPv4)",
+        ipver => 4,
+        scope => undef,
+        want => "192.168.100.207",
+        text => <<EOF, },
+em0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> metric 0 mtu 1500
+	options=81009b<RXCSUM,TXCSUM,VLAN_MTU,VLAN_HWTAGGING,VLAN_HWCSUM,VLAN_HWFILTER>
+	ether 00:00:00:9f:c5:32
+	inet6 fe80::20c:29ff:fe9f:c532%em0 prefixlen 64 scopeid 0x1
+	inet6 2001:db8:450a:e723:20c:29ff:fe9f:c532 prefixlen 64 autoconf
+	inet6 fdb6:1d86:d9bd:3:20c:29ff:fe9f:c532 prefixlen 64 autoconf
+	inet 192.168.100.207 netmask 0xffffff00 broadcast 192.168.100.255
+	media: Ethernet autoselect (1000baseT <full-duplex>)
+	status: active
+	nd6 options=23<PERFORMNUD,ACCEPT_RTADV,AUTO_LINKLOCAL>
+EOF
     {   name => "ifconfig -L en0 (MacOS autoconf IPv6)",
         ipver => 6,
         scope => undef,
@@ -417,6 +469,23 @@ en1: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
 	nd6 options=201<PERFORMNUD,DAD>
 	media: autoselect
 	status: active
+EOF
+    {   name => "ifconfig -L em0 (FreeBSD autoconf IPv6)",
+        ipver => 6,
+        scope => undef,
+        MaxOS => 1,
+        want => "2001:db8:450a:e723:20c:29ff:fe9f:c532",
+        text => <<EOF, },
+em0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> metric 0 mtu 1500
+	options=81009b<RXCSUM,TXCSUM,VLAN_MTU,VLAN_HWTAGGING,VLAN_HWCSUM,VLAN_HWFILTER>
+	ether 00:00:00:9f:c5:32
+	inet6 fe80::20c:29ff:fe9f:c532%em0 prefixlen 64 scopeid 0x1
+	inet6 2001:db8:450a:e723:20c:29ff:fe9f:c532 prefixlen 64 autoconf pltime 86114 vltime 86114
+	inet6 fdb6:1d86:d9bd:3:20c:29ff:fe9f:c532 prefixlen 64 autoconf pltime 86114 vltime 86114
+	inet 192.168.100.207 netmask 0xffffff00 broadcast 192.168.100.255
+	media: Ethernet autoselect (1000baseT <full-duplex>)
+	status: active
+	nd6 options=23<PERFORMNUD,ACCEPT_RTADV,AUTO_LINKLOCAL>
 EOF
     {   name => "ip -4 -o addr show dev eth0 scope global (Buildroot IPv4)",
         ipver => 4,
