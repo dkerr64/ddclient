@@ -2876,15 +2876,16 @@ sub get_default_interface {
         $reply = qx{ netstat -rn 2>/dev/null } if $?;           # Busybox
     }
     failed("Unable to obtain default route information -- missing ip or natstat commands?") if $?;
-    debug2("Raw ip route or netstat information for IPv%s:\n%s", $ipver, $reply);
+    debug("Raw ip route or netstat information for IPv%s:\n%s", $ipver, $reply);
 
     my @list = split(/\n/, $reply);
     @list = grep(/^default|^(?:0\.){3}0|^::\/0/, @list); # Select 'default' or '0.0.0.0' or '::/0'
     return undef if (scalar(@list) == 0);
 
-    ## Interface will be after "dev" or the last word in the line. Must accept blank spaces
-    ## at the end. If we have more than one default route we're going to select the first.
     debug("Default routes found for IPv%s - using first in list:\n%s", $ipver, join("\n",@list));
+    ## Interface will be after "dev" or the last word in the line. Must accept blank spaces
+    ## at the end.  Interface name may not have any whitespace or forward slash.
+    ## If we have more than one default route we're going to select the first.
     $list[0] =~ /\bdev\b\s*\K[^\s\/]+|\b[^\s\/]+(?=[\s\/]*$)/;
     return($&);
 }
@@ -2896,7 +2897,7 @@ sub get_default_interface {
 sub get_ip_from_interface {
     my $interface = shift // "default";
     my $ipver = shift // 4;   ## Defaults to IPv4 if not specified
-    my $scope = lc(shift // "gua"); ## either "gua" or "ula"
+    my $scope = lc(shift // "gua"); ## "gua" or "ula"
     my $reply = shift // '';  ## Pass in data for unit testing purposes only
     my $MacOS = shift // 0;   ## For testing can set to 1 if input data is MacOS/FreeBSD format
     my $count = 0;
@@ -2921,7 +2922,7 @@ sub get_ip_from_interface {
 
         ## IPv4 is simple, we just need to find the first IPv4 address returned in the list.
         my @reply = split(/\n/, $reply);
-        @reply = grep(/\binet\b/, @reply);
+        @reply = grep(/\binet\b/, @reply);  # Select only IPv4 entries
         debug("Raw IPv4 address information for %s: (%s)\r\n%s", $interface, scalar(@reply), join("\n", @reply));
         return extract_ipv4($reply[0]);
     }
@@ -2935,14 +2936,13 @@ sub get_ip_from_interface {
     if ($reply eq '') { ## skip if test data passed in.
         ## Try ip first, then ifconfig with -L for MacOS/FreeBSD then finally ifconfig for everything else
         $reply = qx{ip -6 -o addr show dev $interface scope global 2>/dev/null};  # Linux
-      (($reply = qx{ifconfig -L $interface 2>/dev/null}) && ($MacOS = 1)) if $?;  # MacOS/FreeBSD
-        $reply = qx{ifconfig $interface 2>/dev/null} if $?;                       # Any without iproute2
+      (($reply = qx{ifconfig -L $interface 2>/dev/null}) && ($MacOS = 1)) if $?;  # MacOS/FreeBSD, and remember that
+        $reply = qx{ifconfig $interface 2>/dev/null} if $?;                       # Anything without iproute2 or -L
         failed("Unable to obtain information for '%s' -- missing ip or ifconfig commands?", $interface) if $?;
-        debug("Detected we're probably running on MacOS or FreeBSD") if ($MacOS == 1);
     }
 
     ## IPv6 is more complex than IPv4.  Start by filtering on only "inet6" addresses
-    ## Then remove deprecated or temporary addresses and finally on global or local addresses 
+    ## Then remove deprecated or temporary addresses and finally seleect on global or local addresses 
     my @reply = split(/\n/, $reply);
     @reply = grep(/\binet6\b/, @reply);                             # Select only IPv6 entries
     debug("Raw IPv6 address information for %s: (%s)\r\n%s", $interface, scalar(@reply), join("\n", @reply));
@@ -2970,13 +2970,19 @@ sub get_ip_from_interface {
 
     ## Sort what we have by the prefix length, IP address "length" and finally valid life.
     my @sorted = sort {
-        ## We give preference to IP addressess with the longest prefix...
+        ## We give preference to IP addressess with the longest prefix... so we prefer a /128 over a /64
+        ## this is a decimal (\d+) either after the word "prefixlen" or after a forward slash.
         (($b =~ /(?:\bprefixlen\b\s*|\/)(\d+)/i)[0] // 0) <=> (($a =~ /(?:\bprefixlen\b\s*|\/)(\d+)/i)[0] // 0)
-        ## if there are multiple the same then we prefer "shorter" IP addresses in the
+
+        ## If there are multiple the same then we prefer "shorter" IP addresses in the
         ## theory that a shorter address is more likely assigned by DHCPv6 than SLAAC.
-        ## E.g. 2001:db8:4341:0781::8214/64 is preferable to 2001:DB8:4341:0781:34a6:c329:c52e:8ba6/64
+        ## E.g. 2001:db8:4341:0781::8214/64 is preferable to 2001:db8:4341:0781:34a6:c329:c52e:8ba6/64
+        ## So we count the number () of groups of [0-9a-f] blocks in the IP address.
      || (()= (extract_ipv6($a) // '') =~ /[0-9A-F]+/gi) <=> (()= (extract_ipv6($b) // '') =~ /[0-9A-F]+/gi)
-        ## Finally we sort by remaining valid lifetime (only works with iproute2 or MacOS/FreeBSD)
+
+        ## Finally we check remaining valid lifetime and prefer longer remaining life.
+        ## This is a desimal (\d+) after the word "valid_lft" or "vltime". Only available
+        ## from iproute2 or MacOS/FreeBSD version of ifconfig (-L parameter).
      || (($b =~ /(?:\bvalid_lft\b\s*|\bvltime\b\s*)(\d+)/i)[0] // 0) <=> (($a =~ /(?:\bvalid_lft\b\s*|\bvltime\b\s*)(\d+)/i)[0] // 0)
     } @reply;
     debug("Sorted list of IP addresss for %s: (%s)\r\n%s", $interface, scalar(@sorted), join("\n", @sorted));
@@ -2989,15 +2995,17 @@ sub get_ip_from_interface {
 ## get_ipv4
 ######################################################################
 sub get_ipv4 {
-    my $usev4 = lc shift;
-    my $h   = shift;
-    my $ipv4 = undef;
-    my $reply = '';
-    my $url = '';
-    my $skip = '';
-    my $arg = opt($usev4, $h) // '';
+    my $usev4 = lc shift;   ## Method to obtain IP address
+    my $h     = shift;      ## Host/service making the request
+
+    my $ipv4  = undef;      ## Found IPv4 address
+    my $reply = '';         ## Text returned from various methods
+    my $url   = '';         ## URL of website or firewall
+    my $skip  = '';         ## Regex of pattern to skip before looking for IP
+    my $arg   = opt($usev4, $h) // '';  ## Value assigned to the "usev4" method
 
     if ($usev4 eq 'ipv4') {
+        ## Static IPv4 address is provided in "ipv4=<address>"
         $ipv4  = $arg;
         if (!is_ipv4($ipv4)) {
             warning("'%s' is not a valid IPv4",$ipv4);
@@ -3006,18 +3014,22 @@ sub get_ipv4 {
         $arg = 'ipv4';
 
     } elsif ($usev4 eq 'ifv4') {
+        ## Obtain IPv4 address from interface mamed in "ifv4=<if>"
         warning("'if-skip' is deprecated and does nothing for IPv4") if (opt('if-skip', $h));
         $ipv4 = get_ip_from_interface($arg,4);
 
     } elsif ($usev4 eq 'cmdv4') {
+        ## Obtain IPv4 address by executing the command in "cmdv4=<command>"
         warning("'cmd-skip' is deprecated and does nothing for IPv4") if (opt('cmd-skip', $h));
         if ($arg) {
+            ## TODO - Do we need to quotemeta() the $arg ???
             debug("get_ipv4 cmd: %s",$arg);
-            $reply = `$arg`;
+            $reply = qx{ $arg };
             $reply = '' if $?;
         }
 
     } elsif ($usev4 eq 'webv4') {
+        ## Obtain IPv4 address by accessing website at url in "webv4=<url>"
         $url = $arg;
         $skip = opt('webv4-skip', $h) // '';
         if (exists $builtinweb{$url}) {
@@ -3064,6 +3076,7 @@ sub get_ipv4 {
         ) // '';
 
     } elsif ($usev4 eq 'disabled') {
+        ## This is a no-op... Do not get an IPv4 address for this host/service
         $reply = '';
 
     } else {
