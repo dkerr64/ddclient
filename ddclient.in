@@ -2995,7 +2995,7 @@ sub get_ip_from_interface {
 ## get_ipv4
 ######################################################################
 sub get_ipv4 {
-    my $usev4 = lc shift;   ## Method to obtain IP address
+    my $usev4 = lc(shift);  ## Method to obtain IP address
     my $h     = shift;      ## Host/service making the request
 
     my $ipv4  = undef;      ## Found IPv4 address
@@ -3011,7 +3011,7 @@ sub get_ipv4 {
             warning("'%s' is not a valid IPv4",$ipv4);
             $ipv4 = undef;
         }
-        $arg = 'ipv4';
+        $arg = 'ipv4';  # For debug message at end of function
 
     } elsif ($usev4 eq 'ifv4') {
         ## Obtain IPv4 address from interface mamed in "ifv4=<if>"
@@ -3022,9 +3022,8 @@ sub get_ipv4 {
         ## Obtain IPv4 address by executing the command in "cmdv4=<command>"
         warning("'cmd-skip' is deprecated and does nothing for IPv4") if (opt('cmd-skip', $h));
         if ($arg) {
-            ## TODO - Do we need to quotemeta() the $arg ???
-            debug("get_ipv4 cmd: %s",$arg);
-            $reply = qx{ $arg };
+            my $sys_cmd = quotemeta($arg);
+            $reply = qx{$sys_cmd};
             $reply = '' if $?;
         }
 
@@ -3038,10 +3037,9 @@ sub get_ipv4 {
             $arg  = $url;
         }
         if ($url) {
-            # when using a URL to find IPv4 address we should force use of IPv4
             $reply = geturl( proxy => opt('proxy', $h),
                 url => $url,
-                ipversion => 4,
+                ipversion => 4, # when using a URL to find IPv4 address we should force use of IPv4
                 ssl_validate => opt('ssl-validate', $h),
             ) // '';
         }
@@ -3065,12 +3063,11 @@ sub get_ipv4 {
             $url = "https://" . (opt('fwv4', $h) // opt('fw', $h))  . "/exec/show%20interface%20${queryif}";
         }
         $arg = $url;
-        # when using a URL to find IPv4 address we should force use of IPv4
         $reply = geturl(
             url => $url,
             login => opt('fw-login', $h),
             password => opt('fw-password', $h),
-            ipversion => 4,
+            ipversion => 4, # when using a URL to find IPv4 address we should force use of IPv4
             ignore_ssl_option => 1,
             ssl_validate => opt('ssl-validate', $h),
         ) // '';
@@ -3091,33 +3088,27 @@ sub get_ipv4 {
         }
         $arg = $url;
         if ($url) {
-            # when using a URL to find IPv4 address we should force use of IPv4
             $reply = geturl(
                 url => $url,
                 login => opt('fw-login', $h),
                 password => opt('fw-password', $h),
-                ipversion => 4,
+                ipversion => 4, # when using a URL to find IPv4 address we should force use of IPv4
                 ignore_ssl_option => 1,
                 ssl_validate => opt('ssl-validate', $h),
             ) // '';
         }
     }
 
-    if (!defined $reply) {
-        $reply = '0.0.0.0';
-    }
-
+    ## Set to loopback address if no text set yet
+    $reply = '0.0.0.0' if !defined($reply);
     if ($skip) {
         $skip  =~ s/ /\\s/is;
         $reply =~ s/^.*?${skip}//is;
     }
-
+    ## If $ipv4 not set yet look for IPv4 address in the $reply text
     $ipv4 //= extract_ipv4($reply);
-    warning("did not find IPv4 address") if !defined($ipv4);
-    if (($usev4 ne 'ipv4') && (($ipv4 // '') eq '0.0.0.0')) {
-        $ipv4 = undef;
-    }
-
+    ## Return undef for loopback address unless statically assigned by "ipv4=0.0.0.0"
+    $ipv4 = undef if (($usev4 ne 'ipv4') && (($ipv4 // '') eq '0.0.0.0'));
     debug("get_ipv4: using (%s, %s) reports %s", $usev4, $arg, $ipv4 // "<undefined>");
     return $ipv4;
 }
@@ -3126,18 +3117,21 @@ sub get_ipv4 {
 ## get_ipv6
 ######################################################################
 sub get_ipv6 {
-    my $usev6 = lc shift;
-    my $h = shift;
-    my $ipv6 = undef;
-    my $reply = '';
-    my $url = '';
-    my $skip = '';
-    my $arg = opt($usev6, $h) // '';
+    my $usev6 = lc(shift);  ## Method to obtain IP address
+    my $h     = shift;      ## Host/service making the request
+
+    my $ipv6  = undef;      ## Found IPv6 address
+    my $reply = '';         ## Text returned from various methods
+    my $url   = '';         ## URL of website or firewall
+    my $skip  = '';         ## Regex of pattern to skip before looking for IP
+    my $arg   = opt($usev6, $h) // '';  ## Value assigned to the "usev6" method
 
     if ($usev6 eq 'ipv6' || $usev6 eq 'ip') {
+        ## Static IPv6 address is provided in "ipv6=<address>"
         if ($usev6 eq 'ip') {
             warning("'usev6=ip' is deprecated. Use 'usev6=ipv6'");
             $usev6 = 'ipv6';
+            ## If there is a value for ipv6= use that, else use value for ip=
             $arg = opt($usev6, $h) // $arg;
         }
         $ipv6 = $arg;
@@ -3145,34 +3139,40 @@ sub get_ipv6 {
             warning("'%s' is not a valid IPv6",$ipv6);
             $ipv6 = undef;
         }
-        $arg = 'ipv6';
+        $arg = 'ipv6';  # For debug message at end of function
 
     } elsif ($usev6 eq 'ifv6' || $usev6 eq 'if' ) {
+        ## Obtain IPv6 address from interface mamed in "ifv6=<if>"
         if ($usev6 eq 'if') {
             warning("'usev6=if' is deprecated. Use 'usev6=ifv6'");
             $usev6 = 'ifv6';
+            ## If there is a value for ifv6= use that, else use value for if=
             $arg = opt($usev6, $h) // $arg;
         }
         warning("'if-skip' is deprecated and does nothing for IPv6") if (opt('if-skip', $h));
         $ipv6 = get_ip_from_interface($arg,6);
 
     }  elsif ($usev6 eq 'cmdv6' || $usev6 eq 'cmd') {
+        ## Obtain IPv6 address by executing the command in "cmdv6=<command>"
         if ($usev6 eq 'cmd') {
             warning("'usev6=cmd' is deprecated. Use 'usev6=cmdv6'");
             $usev6 = 'cmdv6';
+            ## If there is a value for cmdv6= use that, else use value for cmd=
             $arg = opt($usev6, $h) // $arg;
         }
         warning("'cmd-skip' is deprecated and does nothing for IPv6") if (opt('cmd-skip', $h));
         if ($arg) {
-            debug("GetIPv6 cmd: %s",$arg);
-            $reply = `$arg`;
+            my $sys_cmd = quotemeta($arg);
+            $reply = qx{$sys_cmd};
             $reply = '' if $?;
         }
 
     } elsif ($usev6 eq 'webv6' || $usev6 eq 'web') {
+        ## Obtain IPv6 address by accessing website at url in "webv6=<url>"
         if ($usev6 eq 'web') {
             warning("'usev6=web' is deprecated. Use 'usev6=webv6'");
             $usev6 = 'webv6';
+            ## If there is a value for webv6= use that, else use value for web=
             $arg = opt($usev6, $h) // $arg;
         }
         warning("'web-skip' does nothing for IPv6. Use 'webv6-skip'") if (opt('web-skip', $h));
@@ -3184,11 +3184,10 @@ sub get_ipv6 {
             $arg  = $url;
         }
         if ($url) {
-            # when using a URL to find IPv6 address we should force use of IPv6
             $reply = geturl(
                 proxy => opt('proxy'),
                 url => $url,
-                ipversion => 6,
+                ipversion => 6, # when using a URL to find IPv6 address we should force use of IPv6
                 ssl_validate => opt('ssl-validate', $h),
             ) // '';
         }
@@ -3198,6 +3197,7 @@ sub get_ipv6 {
         $reply = '';
 
     } elsif ($usev6 eq 'disabled' || $usev6 eq 'no') {
+        ## This is a no-op... Do not get an IPv6 address for this host/service
         warning("'usev6=no' is deprecated. Use 'usev6=disabled'") if ($usev6 eq 'no');
         $reply = '';
 
@@ -3207,21 +3207,16 @@ sub get_ipv6 {
 
     }
 
-    if (!defined $reply) {
-        $reply = '::';
-    }
-
+    ## Set to loopback address if no text set yet
+    $reply = '::' if !defined($reply);
     if ($skip) {
         $skip  =~ s/ /\\s/is;
         $reply =~ s/^.*?${skip}//is;
     }
-
+    ## If $ipv6 not set yet look for IPv6 address in the $reply text
     $ipv6 //= extract_ipv6($reply);
-    warning("did not find IPv6 address") if !defined($ipv6);
-    if (($usev6 ne 'ipv6') && (($ipv6 // '') eq '::')) {
-        $ipv6 = undef;
-    }
-
+    ## Return undef for loopback address unless statically assigned by "ipv6=::"
+    $ipv6 = undef if (($usev6 ne 'ipv6') && (($ipv6 // '') eq '::'));
     debug("get_ipv6: using (%s, %s) reports %s", $usev6, $arg, $ipv6 // "<undefined>");
     return $ipv6;
 }
