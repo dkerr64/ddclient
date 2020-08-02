@@ -2513,7 +2513,7 @@ sub fetch_via_curl {
     my $url = $params{url};
     my $login = $params{login};
     my $password = $params{password};
-    my $ipversion = $params{ipversion} // 0;
+    my $ipversion = (length($params{ipversion})) ? int($params{ipversion}) : 0;
     my $headers = $params{headers} // '';
     my $method = $params{method} // 'GET';
     my $data = $params{data} // '';
@@ -4016,6 +4016,7 @@ Configuration variables applicable to the 'dslreports1' protocol are:
 Example ${program}.conf file entries:
   ## single host update
   protocol=dslreports1,                                     \\
+  server=www.dslreports.com,                                \\
   login=my-dslreports-login,                                \\
   password=my-dslreports-password                           \\
   123456
