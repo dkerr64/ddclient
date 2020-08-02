@@ -2452,6 +2452,7 @@ sub curl_cmd {
         28 => "Operation timeout. The specified time-out period was reached according to the conditions.",
         35 => "SSL connect error. The SSL handshaking failed.",
         47 => "Too many redirects. When following redirects, curl hit the maximum amount.",
+        52 => "The server didn't reply anything, which here is considered an error.",
         51 => "The peer's SSL certificate or SSH MD5 fingerprint was not OK.",
         58 => "Problem with the local certificate.",
         60 => "Peer certificate cannot be authenticated with known CA certificates.",
@@ -2511,7 +2512,7 @@ sub fetch_via_curl {
     my $url = $params{url};
     my $login = $params{login};
     my $password = $params{password};
-    my $ipversion = $params{ipversion} // '';
+    my $ipversion = $params{ipversion} // 0;
     my $headers = $params{headers} // '';
     my $method = $params{method} // 'GET';
     my $data = $params{data} // '';
@@ -2552,8 +2553,8 @@ sub fetch_via_curl {
         push(@curlopt, "insecure") if ($use_ssl && !($params{ssl_validate} // 1));
         push(@curlopt, "cacert=\"".escape_curl_param(opt('ssl_ca_file')).'"') if defined(opt('ssl_ca_file'));
         push(@curlopt, "capath=\"".escape_curl_param(opt('ssl_ca_dir')).'"') if defined(opt('ssl_ca_dir'));
-        push(@curlopt, "ipv4") if ($ipversion eq '4');
-        push(@curlopt, "ipv6") if ($ipversion eq '6');
+        push(@curlopt, "ipv4") if ($ipversion == 4);
+        push(@curlopt, "ipv6") if ($ipversion == 6);
         push(@curlopt, "user-agent=\"".escape_curl_param("${program}/${version}").'"');
         push(@curlopt, "connect-timeout=$timeout");
         push(@curlopt, "max-time=$timeout");
