@@ -605,6 +605,7 @@ my %services = (
         'examples'   => \&nic_dslreports1_examples,
         'variables' => {
             %{$variables{'service-common-defaults'}},
+            'server' => setv(T_FQDNP, 1, 0, 'www.dslreports.com', undef),
             'host' => setv(T_NUMBER, 1, 1, 0, undef),
         },
     },
@@ -2813,6 +2814,38 @@ sub extract_ipv6 {
     return $ip;
 }
 
+my $regex_ipv6_global = qr{
+    (?!  # Is not one of the following addresses:
+        0{0,4}:             # ::/16 is assumed to never contain globaly routable addresses
+      | f[cd][0-9a-f]{2}:   # fc00::/7 RFC4193 ULA
+      | fe[89ab][0-9a-f]:   # fe80::/10 link local
+      | ff[0-9a-f]{2}:      # ff00::/8 multicast
+    )
+    $regex_ipv6             # And is a valid IPv6 address
+}xi;
+
+######################################################################
+## is_ipv6_global() returns true if the string is a valid IPv6 address
+## that is probably globally routable, with no preceding or trailing
+## characters. All addresses in the ::/16 block are assumed to not be
+## globally routable.
+######################################################################
+sub is_ipv6_global {
+    return (shift // '') =~ /\A$regex_ipv6_global\z/
+}
+
+######################################################################
+## extract_ipv6_global() finds the first IPv6 address in the given
+## string that satisfies is_ipv6_global(), removes embedded leading
+## zeros, and returns the result. Returns undef if no such address is
+## found.
+######################################################################
+sub extract_ipv6_global {
+    (shift // '') =~ /($regex_ipv6_global)/ or return undef;
+    (my $ip = $1) =~ s/\b0+\B//g; ## remove embedded leading zeros
+    return $ip;
+}
+
 ######################################################################
 ## Regex that matches an IPv6 address that is probably globally routable.
 ## Accepts embedded leading zeros.
@@ -3983,7 +4016,6 @@ Configuration variables applicable to the 'dslreports1' protocol are:
 Example ${program}.conf file entries:
   ## single host update
   protocol=dslreports1,                                     \\
-  server=www.dslreports.com,                                \\
   login=my-dslreports-login,                                \\
   password=my-dslreports-password                           \\
   123456
