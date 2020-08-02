@@ -2284,7 +2284,7 @@ sub fetch_via_curl {
     my $url = $params{url};
     my $login = $params{login};
     my $password = $params{password};
-    my $ipversion = (length($params{ipversion})) ? int($params{ipversion}) : 0;
+    my $ipversion = ($params{ipversion}) ? int($params{ipversion}) : 0;
     my $headers = $params{headers} // '';
     my $method = $params{method} // 'GET';
     my $data = $params{data} // '';
