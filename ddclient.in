@@ -3987,7 +3987,6 @@ Configuration variables applicable to the 'dslreports1' protocol are:
 Example ${program}.conf file entries:
   ## single host update
   protocol=dslreports1,                                     \\
-  server=www.dslreports.com,                                \\
   login=my-dslreports-login,                                \\
   password=my-dslreports-password                           \\
   123456
