@@ -103,6 +103,7 @@ EOF
 2: ens33    inet6 2001:db8:450a:e723:514:cbd9:c55f:8e2a/64 scope global temporary deprecated dynamic \       valid_lft 86282sec preferred_lft 0sec
 2: ens33    inet6 2001:db8:450a:e723:dbc5:1c4e:9e9b:97a2/64 scope global dynamic mngtmpaddr noprefixroute \       valid_lft 86282sec preferred_lft 86282sec
 EOF
+        want_extract_ipv6_global => "2001:db8:450a:e723:adee:be82:7fba:ffb2",
         want_ipv6gua_from_if => "2001:db8:450a:e723::21",
         want_ipv6ula_from_if => "fdb6:1d86:d9bd:3::21",
     },
@@ -110,6 +111,7 @@ EOF
         text => <<EOF,
 2: ens33    inet6 2001:db8:450a:e723::101/64 scope global noprefixroute \       valid_lft forever preferred_lft forever
 EOF
+        want_extract_ipv6_global => "2001:db8:450a:e723::101",
         want_ipv6gua_from_if => "2001:db8:450a:e723::101",
     },
     {   name => "ifconfig ens33 (most linux autoconf IPv6 and DHCPv6)",
@@ -129,6 +131,7 @@ ens33: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
         TX packets 33294  bytes 6838768 (6.8 MB)
         TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
 EOF
+        want_extract_ipv6_global => "2001:db8:450a:e723:adee:be82:7fba:ffb2",
         want_ipv6gua_from_if => "2001:db8:450a:e723::21",
         want_ipv6ula_from_if => "fdb6:1d86:d9bd:3::21",
         want_ipv4_from_if => "198.51.100.33",
@@ -146,6 +149,7 @@ ens33: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
         TX packets 32493  bytes 6706131 (6.7 MB)
         TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
 EOF
+        want_extract_ipv6_global => "2001:db8:450a:e723::21",
         want_ipv6gua_from_if => "2001:db8:450a:e723::21",
         want_ipv6ula_from_if => "fdb6:1d86:d9bd:3::21",
         want_ipv4_from_if => "198.51.100.33",
@@ -162,6 +166,7 @@ ens33: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
         TX packets 31556  bytes 6552122 (6.5 MB)
         TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
 EOF
+        want_extract_ipv6_global => "2001:db8:450a:e723::101",
         want_ipv6gua_from_if => "2001:db8:450a:e723::101",
         want_ipv4_from_if => "198.51.100.33",
     },
@@ -183,6 +188,7 @@ en0: flags=8963<UP,BROADCAST,SMART,RUNNING,PROMISC,SIMPLEX,MULTICAST> mtu 9000
 	media: 1000baseT <full-duplex,flow-control,energy-efficient-ethernet>
 	status: active
 EOF
+        want_extract_ipv6_global => "2001:db8:450a:e723:1c99:99e2:21d0:79e6",
         want_ipv6gua_from_if => "2001:db8:450a:e723:1c99:99e2:21d0:79e6",
         want_ipv6ula_from_if => "fdb6:1d86:d9bd:3::8076",
         want_ipv4_from_if => "198.51.100.5",
@@ -200,6 +206,7 @@ em0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> metric 0 mtu 1500
 	status: active
 	nd6 options=23<PERFORMNUD,ACCEPT_RTADV,AUTO_LINKLOCAL>
 EOF
+        want_extract_ipv6_global => "2001:db8:450a:e723:20c:29ff:fe9f:c532",
         want_ipv6gua_from_if => "2001:db8:450a:e723:20c:29ff:fe9f:c532",
         want_ipv6ula_from_if => "fdb6:1d86:d9bd:3:20c:29ff:fe9f:c532",
         want_ipv4_from_if => "198.51.100.207",
@@ -223,6 +230,7 @@ en0: flags=8963<UP,BROADCAST,SMART,RUNNING,PROMISC,SIMPLEX,MULTICAST> mtu 9000
 	media: 1000baseT <full-duplex,flow-control,energy-efficient-ethernet>
 	status: active
 EOF
+        want_extract_ipv6_global => "2001:db8:450a:e723:1c99:99e2:21d0:79e6",
         want_ipv6gua_from_if => "2001:db8:450a:e723:1c99:99e2:21d0:79e6",
         want_ipv6ula_from_if => "fdb6:1d86:d9bd:3::8076",
         want_ipv4_from_if => "198.51.100.5",
@@ -240,6 +248,7 @@ en1: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
 	media: autoselect
 	status: active
 EOF
+        want_extract_ipv6_global => "2001:db8:450a:e723::100",
         want_ipv6gua_from_if => "2001:db8:450a:e723::100",
         want_ipv4_from_if => "198.51.100.199",
     },
@@ -257,6 +266,7 @@ em0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> metric 0 mtu 1500
 	status: active
 	nd6 options=23<PERFORMNUD,ACCEPT_RTADV,AUTO_LINKLOCAL>
 EOF
+        want_extract_ipv6_global => "2001:db8:450a:e723:20c:29ff:fe9f:c532",
         want_ipv6gua_from_if => "2001:db8:450a:e723:20c:29ff:fe9f:c532",
         want_ipv6ula_from_if => "fdb6:1d86:d9bd:3:20c:29ff:fe9f:c532",
         want_ipv4_from_if => "198.51.100.207",
@@ -271,6 +281,7 @@ EOF
         text => <<EOF,
 2: eth0    inet6 2001:db8:450b:13f:ed44:eb63:b070:212f/128 scope global \       valid_lft forever preferred_lft forever
 EOF
+        want_extract_ipv6_global => "2001:db8:450b:13f:ed44:eb63:b070:212f",
         want_ipv6gua_from_if => "2001:db8:450b:13f:ed44:eb63:b070:212f",
     },
     {   name => "ifconfig eth0 (Busybox)",
@@ -285,6 +296,7 @@ eth0      Link encap:Ethernet  HWaddr 00:00:00:08:60:B4
           collisions:0 txqueuelen:1000 
           RX bytes:41724254079 (38.8 GiB)  TX bytes:3221012240 (2.9 GiB)
 EOF
+        want_extract_ipv6_global => "2001:db8:450b:13f:ed44:eb63:b070:212f",
         want_ipv6gua_from_if => "2001:db8:450b:13f:ed44:eb63:b070:212f",
         want_ipv4_from_if => "198.51.157.237",
     },
