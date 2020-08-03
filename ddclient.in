@@ -2921,7 +2921,7 @@ my $regex_ipv6_ula = qr{
 ## the IP routing table on the system.
 ######################################################################
 sub get_default_interface {
-    my $ipver = shift // 4;
+    my $ipver = int(shift // 4);    ## Defaults to IPv4 if not specified
     my $ipstr = ($ipver == 6) ? 'inet6' : 'inet';
     my $reply = shift // '';  ## Pass in data for unit testing purposes only
 
@@ -2956,7 +2956,7 @@ sub get_default_interface {
 ######################################################################
 sub get_ip_from_interface {
     my $interface = shift // "default";
-    my $ipver = shift // 4;   ## Defaults to IPv4 if not specified
+    my $ipver = int(shift // 4);    ## Defaults to IPv4 if not specified
     my $scope = lc(shift // "gua"); ## "gua" or "ula"
     my $reply = shift // '';  ## Pass in data for unit testing purposes only
     my $MacOS = shift // 0;   ## For testing can set to 1 if input data is MacOS/FreeBSD format
