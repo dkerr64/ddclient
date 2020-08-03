@@ -2465,19 +2465,26 @@ sub get_default_interface {
     my $ipver = int(shift // 4);    ## Defaults to IPv4 if not specified
     my $ipstr = ($ipver == 6) ? 'inet6' : 'inet';
     my $reply = shift // '';  ## Pass in data for unit testing purposes only
+    my $cmd = "test data";
 
     return undef if (($ipver != 4) && ($ipver != 6));
 
     if ($reply eq '') { ## skip if test data passed in.
         ## Best option is the ip command from iproute2 package
-        $reply = qx{ ip -$ipver -o route list match default 2>/dev/null };
+        $cmd = "ip -$ipver -o route list match default"; $reply = qx{ $cmd 2>/dev/null };
         ## Fallback is the netstat command. This is only option on MacOS.
-        $reply = qx{ netstat -rn -$ipver 2>/dev/null } if $?;   # Linux, FreeBSD
-        $reply = qx{ netstat -rn -f $ipstr 2>/dev/null } if $?; # MacOS
-        $reply = qx{ netstat -rn 2>/dev/null } if $?;           # Busybox
+        if ($?) { $cmd = "netstat -rn -$ipver";     $reply = qx{ $cmd 2>/dev/null }; } # Linux, FreeBSD
+        if ($?) { $cmd = "netstat -rn -f $ipstr";   $reply = qx{ $cmd 2>/dev/null }; } # MacOS
+        if ($?) { $cmd = "netstat -rn";             $reply = qx{ $cmd 2>/dev/null }; } # Busybox
+        if ($?) {
+            $cmd = "missing ip or netstat commands";
+            failed("Unable to obtain default route information -- %s", $cmd)
+        }
     }
-    failed("Unable to obtain default route information -- missing ip or natstat commands?") if $?;
-    debug("Raw ip route or netstat information for IPv%s:\n%s", $ipver, $reply);
+    debug("Reply from '%s' :\n------\n%s------", $cmd, $reply);
+
+    # Check we have IPv6 data in case we got routing table from non-specific cmd above
+    return undef if (($ipver ==6) && !extract_ipv6($reply));
 
     my @list = split(/\n/, $reply);
     @list = grep(/^default|^(?:0\.){3}0|^::\/0/, @list); # Select 'default' or '0.0.0.0' or '::/0'
@@ -2502,6 +2509,7 @@ sub get_ip_from_interface {
     my $reply = shift // '';  ## Pass in data for unit testing purposes only
     my $MacOS = shift // 0;   ## For testing can set to 1 if input data is MacOS/FreeBSD format
     my $count = 0;
+    my $cmd = "test data";
 
     if (($ipver != 4) && ($ipver != 6)) {
         warning("get_ip_from_interface() invalid IP version: %s", $ipver);
@@ -2516,15 +2524,18 @@ sub get_ip_from_interface {
     if ($ipver == 4) {
         if ($reply eq '') { ## skip if test data passed in.
             ## Try ip first, then ifconfig.
-            $reply = qx{ ip -4 -o addr show dev $interface scope global 2>/dev/null };
-            $reply = qx{ ifconfig $interface 2>/dev/null } if $?;
-            failed("Unable to obtain information for '%s' -- missing ip or ifconfig commands?", $interface) if $?;
+            $cmd = "ip -4 -o addr show dev $interface scope global"; $reply = qx{$cmd 2>/dev/null};
+            if ($?) { $cmd = "ifconfig $interface";                  $reply = qx{$cmd 2>/dev/null}; }
+            if ($?) {
+                $cmd = "missing ip or ifconfig command";
+                failed("Unable to obtain information for '%s' -- %s", $interface, $cmd);
+            }
         }
+        debug("Reply from '%s' :\n------\n%s------", $cmd, $reply);
 
         ## IPv4 is simple, we just need to find the first IPv4 address returned in the list.
         my @reply = split(/\n/, $reply);
         @reply = grep(/\binet\b/, @reply);  # Select only IPv4 entries
-        debug("Raw IPv4 address information for %s: (%s)\r\n%s", $interface, scalar(@reply), join("\n", @reply));
         return extract_ipv4($reply[0]);
     }
 
@@ -2534,19 +2545,23 @@ sub get_ip_from_interface {
         $scope = "gua";
     }
 
+    $cmd = "test data";
     if ($reply eq '') { ## skip if test data passed in.
         ## Try ip first, then ifconfig with -L for MacOS/FreeBSD then finally ifconfig for everything else
-        $reply = qx{ip -6 -o addr show dev $interface scope global 2>/dev/null};  # Linux
-      (($reply = qx{ifconfig -L $interface 2>/dev/null}) && ($MacOS = 1)) if $?;  # MacOS/FreeBSD, and remember that
-        $reply = qx{ifconfig $interface 2>/dev/null} if $?;                       # Anything without iproute2 or -L
-        failed("Unable to obtain information for '%s' -- missing ip or ifconfig commands?", $interface) if $?;
+        $cmd = "ip -6 -o addr show dev $interface scope global"; $reply = qx{$cmd 2>/dev/null};   # Linux
+        if ($?) { $cmd = "ifconfig -L $interface"; $MacOS = 1;   $reply = qx{$cmd 2>/dev/null}; } # MacOS/FreeBSD
+        if ($?) { $cmd = "ifconfig $interface";                  $reply = qx{$cmd 2>/dev/null}; } # Anything without iproute2 or -L
+        if ($?) {
+            $cmd = "missing ip or ifconfig command";
+            failed("Unable to obtain information for '%s' -- %s", $interface, $cmd);
+        }
     }
+    debug("Reply from '%s' :\n------\n%s------", $cmd, $reply);
 
     ## IPv6 is more complex than IPv4.  Start by filtering on only "inet6" addresses
     ## Then remove deprecated or temporary addresses and finally seleect on global or local addresses 
     my @reply = split(/\n/, $reply);
     @reply = grep(/\binet6\b/, @reply);                             # Select only IPv6 entries
-    debug("Raw IPv6 address information for %s: (%s)\r\n%s", $interface, scalar(@reply), join("\n", @reply));
     @reply = grep(!/\bdeprecated\b|\btemporary\b/, @reply);         # Remove deprecated and temporary
     @reply = ($scope eq "gua") ? grep(/$regex_ipv6_global/, @reply) # Select only global addresses
                                : grep(/$regex_ipv6_ula/, @reply);   #   or only ULA addresses
