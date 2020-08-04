@@ -489,9 +489,9 @@ my %variables = (
         'if-skip'             => setv(T_STRING,0, 0, '',                   undef),
         'web'                 => setv(T_STRING,0, 0, 'dyndns',             undef),
         'web-skip'            => setv(T_STRING,0, 0, '',                   undef),
-        'webv4'               => setv(T_STRING,0, 0, undef,	           undef),
+        'webv4'               => setv(T_STRING,0, 0, undef,                undef),
         'webv4-skip'          => setv(T_STRING,0, 0, '',                   undef),
-        'webv6'               => setv(T_STRING,0, 0, undef,	           undef),
+        'webv6'               => setv(T_STRING,0, 0, undef,                undef),
         'webv6-skip'          => setv(T_STRING,0, 0, '',                   undef),
         'web-ssl-validate'    => setv(T_BOOL,  0, 0, 1,                    undef),
         'fw'                  => setv(T_ANY,   0, 0, '',                   undef),
@@ -930,7 +930,6 @@ my @opt = (
     ["quiet",        "!",  "-{no}quiet            : print {no} messages for unnecessary updates"],
     ["help",         "",   "-help                 : display this message and exit"],
     ["postscript",   "",   "-postscript           : script to run after updating ddclient, has new IP as param"],
-
     ["query",        "!",  "-{no}query            : print {no} ip addresses and exit"],
     ["fw-banlocal",  "!",  ""], ## deprecated
     ["test",         "!",  ""], ## hidden
