@@ -144,7 +144,7 @@ jobs:
               perl-HTTP-Daemon \
               perl-IO-Socket-INET6 \
               perl-core \
-              net-tools \
+              iproute \
               ;
       - name: autogen
         run: ./autogen
