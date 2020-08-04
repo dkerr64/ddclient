@@ -431,7 +431,6 @@ my %variables = (
         'if'                  => setv(T_IF,    0, 0, 'ppp0',               undef),
         'ifv4'                => setv(T_IF,    0, 0, 'default',            undef),
         'ifv6'                => setv(T_IF,    0, 0, 'default',            undef),
-        'if-skip'             => setv(T_STRING,1, 0, '',                   undef),
         'web'                 => setv(T_STRING,0, 0, 'dyndns',             undef),
         'web-skip'            => setv(T_STRING,1, 0, '',                   undef),
         'webv4'               => setv(T_STRING,0, 0, '',                   undef),
@@ -486,7 +485,6 @@ my %variables = (
         'if'                  => setv(T_IF,    0, 0, 'ppp0',               undef),
         'ifv4'                => setv(T_IF,    0, 0, undef,                undef),
         'ifv6'                => setv(T_IF,    0, 0, undef,                undef),
-        'if-skip'             => setv(T_STRING,0, 0, '',                   undef),
         'web'                 => setv(T_STRING,0, 0, 'dyndns',             undef),
         'web-skip'            => setv(T_STRING,0, 0, '',                   undef),
         'webv4'               => setv(T_STRING,0, 0, undef,                undef),
@@ -846,7 +844,9 @@ $variables{'merged'} = {
 
 # This will hold the processed args.
 my %opt = ();
-$opt{'fw-banlocal'} = sub { warning("'-fw-banlocal' is deprecated and does nothing") };
+my $deprecated_handler = sub { warning("'-$_[0]' is deprecated and does nothing"); };
+$opt{'fw-banlocal'} = $deprecated_handler;
+$opt{'if-skip'} = $deprecated_handler;
 
 my @opt = (
     "usage: ${program} [options]",
@@ -876,7 +876,6 @@ my @opt = (
     ["if",           "=s", "-if <interface>       : deprecated, use 'ifv4' or 'ifv6'"],
     ["ifv4",         "=s", "-ifv4 <interface>     : obtain IPv4 address from <interface>"],
     ["ifv6",         "=s", "-ifv6 <interface>     : obtain IPv6 address from <interface>"],
-    ["if-skip",      "=s", "-if-skip <pattern>    : deprecated, not required"],
     "",
     "  Options that apply to 'use=web':",
     ["web",          "=s", "-web <service>|<url>  : deprecated, use 'webv4' or 'webv6'"],
@@ -932,6 +931,7 @@ my @opt = (
     ["postscript",   "",   "-postscript           : script to run after updating ddclient, has new IP as param"],
     ["query",        "!",  "-{no}query            : print {no} ip addresses and exit"],
     ["fw-banlocal",  "!",  ""], ## deprecated
+    ["if-skip",      "=s", ""], ## deprecated
     ["test",         "!",  ""], ## hidden
     ["geturl",       "=s", ""], ## hidden
     "",
@@ -1257,8 +1257,8 @@ sub parse_assignments {
         (my $name, my $value, $rest) = parse_assignment($rest);
         $rest =~ s/^[,\s]+//;
         return ($rest, %variables) if !defined($name);
-        if ($name eq 'fw-banlocal') {
-            warning("'fw-banlocal' is deprecated and does nothing");
+        if ($name eq 'fw-banlocal' || $name eq 'if-skip') {
+            warning("'$name' is deprecated and does nothing");
             next;
         }
         $variables{$name} = $value;
@@ -1501,8 +1501,8 @@ sub init_config {
         my %options = ();
         foreach my $opt (split_by_comma($opt{'options'})) {
             my ($name, $var) = split /\s*=\s*/, $opt;
-            if ($name eq 'fw-banlocal') {
-                warning("'fw-banlocal' is deprecated and does nothing");
+            if ($name eq 'fw-banlocal' || $name eq 'if-skip') {
+                warning("'$name' is deprecated and does nothing");
                 next;
             }
             $options{$name} = $var;
@@ -2674,7 +2674,6 @@ sub get_ip {
         $arg = 'ip';
 
     } elsif ($use eq 'if') {
-        warning("'if-skip' is deprecated") if (opt('if-skip', $h));
         $ip = get_ip_from_interface($arg);
 
     } elsif ($use eq 'cmd') {
@@ -2771,7 +2770,7 @@ sub get_ip {
     if (!defined $reply) {
         $reply = '';
     }
-    if ($skip) {
+    if (($skip // '') ne '') {
         $skip  =~ s/ /\\s/is;
         $reply =~ s/^.*?${skip}//is;
     }
@@ -3200,7 +3199,7 @@ sub get_ipv4 {
 
     ## Set to loopback address if no text set yet
     $reply = '0.0.0.0' if !defined($reply);
-    if ($skip) {
+    if (($skip // '') ne '') {
         $skip  =~ s/ /\\s/is;
         $reply =~ s/^.*?${skip}//is;
     }
@@ -3308,7 +3307,7 @@ sub get_ipv6 {
 
     ## Set to loopback address if no text set yet
     $reply = '::' if !defined($reply);
-    if ($skip) {
+    if (($skip // '') ne '') {
         $skip  =~ s/ /\\s/is;
         $reply =~ s/^.*?${skip}//is;
     }
