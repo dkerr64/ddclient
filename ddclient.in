@@ -1128,7 +1128,6 @@ sub update_nics {
                         warning("%s: unable to determine IP address with strategy use=%s", $h, $use)
                             if !$daemon || opt('verbose');
                     }
-                    debug("IP %s", $ip // "<undefined>");
                 }
                 # And remember it as the IP address we want to send to the DNS service.
                 $config{$h}{'wantip'} = $ip;
@@ -1148,7 +1147,6 @@ sub update_nics {
                         warning("%s: unable to determine IPv4 address with strategy usev4=%s", $h, $usev4)
                             if !$daemon || opt('verbose');
                     }
-                    debug("IPv4 %s", $ipv4 // "<undefined>");
                 }
                 # And remember it as the IPv4 address we want to send to the DNS service.
                 $config{$h}{'wantipv4'} = $ipv4;
@@ -1168,7 +1166,6 @@ sub update_nics {
                         warning("%s: unable to determine IPv6 address with strategy usev6=%s", $h, $usev6)
                             if !$daemon || opt('verbose');
                     }
-                    debug("IPv6 %s", $ipv6 // "<undefined>");
                 }
                 # And remember it as the IP address we want to send to the DNS service.
                 $config{$h}{'wantipv6'} = $ipv6;
