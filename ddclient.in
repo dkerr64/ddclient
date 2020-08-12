@@ -3838,17 +3838,17 @@ sub nic_dyndns1_update {
         }
 
         if ($return_code ne 'NOERROR' || $error_code ne 'NOERROR' || !$title) {
-            $config{$h}{'status'} = 'failed';
+            $config{$h}{'status-ipv4'} = 'failed';
             $title = "incomplete response from $config{$h}{server}" unless $title;
             warning("SENT:    %s", $url) unless opt('verbose');
             warning("REPLIED: %s", $reply);
             failed("updating %s: %s", $h, $title);
 
         } else {
-            $config{$h}{'ip'}     = $ip;
+            $config{$h}{'ipv4'}   = $ip;
             $config{$h}{'mtime'}  = $now;
-            $config{$h}{'status'} = 'good';
-            success("updating %s: %s: IP address set to %s (%s)", $h, $return_code, $ip, $title);
+            $config{$h}{'status-ipv4'} = 'good';
+            success("updating %s: %s: IPv4 address set to %s (%s)", $h, $return_code, $ip, $title);
         }
     }
 }
@@ -4017,18 +4017,18 @@ sub nic_dyndns2_update {
                 $ip = $returnedip if (not $ip);
                 my $h = shift @hosts;
 
-                $config{$h}{'status'} = $status;
+                $config{$h}{'status-ipv4'} = $status;
                 if ($status eq 'good') {
-                    $config{$h}{'ip'}    = $ip;
+                    $config{$h}{'ipv4'}  = $ip;
                     $config{$h}{'mtime'} = $now;
-                    success("updating %s: %s: IP address set to %s", $h, $status, $ip);
+                    success("updating %s: %s: IPv4 address set to %s", $h, $status, $ip);
 
                 } elsif (exists $errors{$status}) {
                     if ($status eq 'nochg') {
                         warning("updating %s: %s: %s", $h, $status, $errors{$status});
-                        $config{$h}{'ip'}     = $ip;
+                        $config{$h}{'ipv4'}   = $ip;
                         $config{$h}{'mtime'}  = $now;
-                        $config{$h}{'status'} = 'good';
+                        $config{$h}{'status-ipv4'} = 'good';
 
                     } else {
                         failed("updating %s: %s: %s", $h, $status, $errors{$status});
@@ -4122,18 +4122,18 @@ sub nic_noip_update {
                 my ($status, $ip) = split / /, lc $line;
                 my $h = shift @hosts;
 
-                $config{$h}{'status'} = $status;
+                $config{$h}{'status-ipv4'} = $status;
                 if ($status eq 'good') {
-                    $config{$h}{'ip'}     = $ip;
+                    $config{$h}{'ipv4'}   = $ip;
                     $config{$h}{'mtime'}  = $now;
-                    success("updating %s: %s: IP address set to %s", $h, $status, $ip);
+                    success("updating %s: %s: IPv4 address set to %s", $h, $status, $ip);
 
                 } elsif (exists $errors{$status}) {
                     if ($status eq 'nochg') {
                         warning("updating %s: %s: %s", $h, $status, $errors{$status});
-                        $config{$h}{'ip'}     = $ip;
+                        $config{$h}{'ipv4'}   = $ip;
                         $config{$h}{'mtime'}  = $now;
-                        $config{$h}{'status'} = 'good';
+                        $config{$h}{'status-ipv4'} = 'good';
 
                     } else {
                         failed("updating %s: %s: %s", $h, $status, $errors{$status});
@@ -4252,16 +4252,16 @@ sub nic_dslreports1_update {
         }
 
         if ($return_code !~ /NOERROR/) {
-            $config{$h}{'status'} = 'failed';
+            $config{$h}{'status-ipv4'} = 'failed';
             warning("SENT:    %s", $url) unless opt('verbose');
             warning("REPLIED: %s", $reply);
             failed("updating %s", $h);
 
         } else {
-            $config{$h}{'ip'}     = $ip;
+            $config{$h}{'ipv4'}   = $ip;
             $config{$h}{'mtime'}  = $now;
-            $config{$h}{'status'} = 'good';
-            success("updating %s: %s: IP address set to %s", $h, $return_code, $ip);
+            $config{$h}{'status-ipv4'} = 'good';
+            success("updating %s: %s: IPv4 address set to %s", $h, $return_code, $ip);
         }
     }
 }
@@ -4360,14 +4360,14 @@ sub nic_zoneedit1_update {
                     $status_ip   = $var{'IP'}   if exists $var{'IP'};
 
                     if ($status eq 'SUCCESS' || ($status eq 'ERROR' && ($var{'CODE'} eq '707' || $var{'CODE'} eq '702'))) {
-                        $config{$h}{'ip'}     = $status_ip;
+                        $config{$h}{'ipv4'}   = $status_ip;
                         $config{$h}{'mtime'}  = $now;
-                        $config{$h}{'status'} = 'good';
+                        $config{$h}{'status-ipv4'} = 'good';
 
-                        success("updating %s: IP address set to %s (%s: %s)", $h, $ip, $status_code, $status_text);
+                        success("updating %s: IPv4 address set to %s (%s: %s)", $h, $ip, $status_code, $status_text);
 
                     } else {
-                        $config{$h}{'status'} = 'failed';
+                        $config{$h}{'status-ipv4'} = 'failed';
                         failed("updating %s: %s: %s", $h, $status_code, $status_text);
                     }
                     shift @hosts;
@@ -4517,11 +4517,11 @@ sub nic_easydns_update {
                 my ($status) = $line =~ /^(\S*)\b.*/;
                 my $h = shift @hosts;
 
-                $config{$h}{'status'} = $status;
+                $config{$h}{'status-ipv4'} = $status;
                 if ($status eq 'NOERROR') {
-                    $config{$h}{'ip'}    = $ip;
+                    $config{$h}{'ipv4'}  = $ip;
                     $config{$h}{'mtime'} = $now;
-                    success("updating %s: %s: IP address set to %s", $h, $status, $ip);
+                    success("updating %s: %s: IPv4 address set to %s", $h, $status, $ip);
 
                 } elsif ($status =~ /TOOSOON/) {
                     ## make sure we wait at least a little
@@ -4618,12 +4618,12 @@ sub nic_namecheap_update {
 
         my @reply = split /\n/, $reply;
         if (grep /<ErrCount>0/i, @reply) {
-            $config{$h}{'ip'}     = $ip;
+            $config{$h}{'ipv4'}   = $ip;
             $config{$h}{'mtime'}  = $now;
-            $config{$h}{'status'} = 'good';
-            success("updating %s: good: IP address set to %s", $h, $ip);
+            $config{$h}{'status-ipv4'} = 'good';
+            success("updating %s: good: IPv4 address set to %s", $h, $ip);
         } else {
-            $config{$h}{'status'} = 'failed';
+            $config{$h}{'status-ipv4'} = 'failed';
             warning("SENT:    %s", $url) unless opt('verbose');
             warning("REPLIED: %s", $reply);
             failed("updating %s: Invalid reply.", $h);
@@ -4792,7 +4792,7 @@ sub nic_nfsn_update {
         if ($h eq $zone) {
             $name = '';
         } elsif ($h !~ /$zone$/) {
-            $config{$h}{'status'} = 'failed';
+            $config{$h}{'status-ipv4'} = 'failed';
             failed("updating %s: %s is outside zone %s", $h, $h, $zone);
             next;
         } else {
@@ -4808,7 +4808,7 @@ sub nic_nfsn_update {
         my $list_body = encode_www_form_urlencoded({name => $name, type => 'A'});
         my $list_resp = nic_nfsn_make_request($h, $list_path, 'POST', $list_body);
         if (!header_ok($h, $list_resp)) {
-            $config{$h}{'status'} = 'failed';
+            $config{$h}{'status-ipv4'} = 'failed';
             nic_nfsn_handle_error($list_resp, $h);
             next;
         }
@@ -4816,7 +4816,7 @@ sub nic_nfsn_update {
         $list_resp =~ s/^.*?\n\n//s;  # Strip header
         my $list = eval { decode_json($list_resp) };
         if ($@) {
-            $config{$h}{'status'} = 'failed';
+            $config{$h}{'status-ipv4'} = 'failed';
             failed("updating %s: JSON decoding failure", $h);
             next;
         }
@@ -4833,7 +4833,7 @@ sub nic_nfsn_update {
             my $rm_resp = nic_nfsn_make_request($h, $rm_path,
                                                 'POST', $rm_body);
             if (!header_ok($h, $rm_resp)) {
-                $config{$h}{'status'} = 'failed';
+                $config{$h}{'status-ipv4'} = 'failed';
                 nic_nfsn_handle_error($rm_resp);
                 next;
             }
@@ -4848,12 +4848,12 @@ sub nic_nfsn_update {
         my $add_resp = nic_nfsn_make_request($h, $add_path, 'POST',
                                              $add_body);
         if (header_ok($h, $add_resp)) {
-            $config{$h}{'ip'}     = $ip;
+            $config{$h}{'ipv4'}   = $ip;
             $config{$h}{'mtime'}  = $now;
-            $config{$h}{'status'} = 'good';
-            success("updating %s: good: IP address set to %s", $h, $ip);
+            $config{$h}{'status-ipv4'} = 'good';
+            success("updating %s: good: IPv4 address set to %s", $h, $ip);
         } else {
-            $config{$h}{'status'} = 'failed';
+            $config{$h}{'status-ipv4'} = 'failed';
             nic_nfsn_handle_error($add_resp, $h);
         }
     }
@@ -4926,12 +4926,12 @@ sub nic_sitelutions_update {
 
         my @reply = split /\n/, $reply;
         if (grep /success/i, @reply) {
-            $config{$h}{'ip'}     = $ip;
+            $config{$h}{'ipv4'}   = $ip;
             $config{$h}{'mtime'}  = $now;
-            $config{$h}{'status'} = 'good';
-            success("updating %s: good: IP address set to %s", $h, $ip);
+            $config{$h}{'status-ipv4'} = 'good';
+            success("updating %s: good: IPv4 address set to %s", $h, $ip);
         } else {
-            $config{$h}{'status'} = 'failed';
+            $config{$h}{'status-ipv4'} = 'failed';
             warning("SENT:    %s", $url) unless opt('verbose');
             warning("REPLIED: %s", $reply);
             failed("updating %s: Invalid reply.", $h);
@@ -5154,12 +5154,12 @@ sub nic_changeip_update {
 
         my @reply = split /\n/, $reply;
         if (grep /success/i, @reply) {
-            $config{$h}{'ip'}     = $ip;
+            $config{$h}{'ipv4'}   = $ip;
             $config{$h}{'mtime'}  = $now;
-            $config{$h}{'status'} = 'good';
-            success("updating %s: good: IP address set to %s", $h, $ip);
+            $config{$h}{'status-ipv4'} = 'good';
+            success("updating %s: good: IPv4 address set to %s", $h, $ip);
         } else {
-            $config{$h}{'status'} = 'failed';
+            $config{$h}{'status-ipv4'} = 'failed';
             warning("SENT:    %s", $url) unless opt('verbose');
             warning("REPLIED: %s", $reply);
             failed("updating %s: Invalid reply.", $h);
@@ -5240,9 +5240,9 @@ sub nic_googledomains_update {
             next if !header_ok($host, $reply);
 
             # Cache
-            $config{$host}{'ip'}     = $ip;
+            $config{$host}{'ipv4'}   = $ip;
             $config{$host}{'mtime'}  = $now;
-            $config{$host}{'status'} = 'good';
+            $config{$host}{'status-ipv4'} = 'good';
         }
     }
 }
@@ -5350,9 +5350,9 @@ EoINSTR3
             my $status = pipecmd($command, $instructions);
             if ($status eq 1) {
                 foreach (@hosts) {
-                    $config{$_}{'ip'}    = $ip;
+                    $config{$_}{'ipv4'}  = $ip;
                     $config{$_}{'mtime'} = $now;
-                    success("updating %s: %s: IP address set to %s", $_, $status, $ip);
+                    success("updating %s: %s: IPv4 address set to %s", $_, $status, $ip);
                 }
             } else {
                 foreach (@hosts) {
@@ -5681,9 +5681,9 @@ sub nic_yandex_update {
             }
 
             # Cache
-            $config{$host}{'ip'}     = $ip;
+            $config{$host}{'ipv4'}   = $ip;
             $config{$host}{'mtime'}  = $now;
-            $config{$host}{'status'} = 'good';
+            $config{$host}{'status-ipv4'} = 'good';
         }
     }
 }
@@ -5762,11 +5762,11 @@ sub nic_duckdns_update {
                 my $returned = pop(@reply);
                 if ($returned =~ /OK/) {
                     success("updating %s: IPv4 address set to %s", $host, $ip);
-                    $config{$host}{'ip'}     = $ip;
+                    $config{$host}{'ipv4'}   = $ip;
                     $config{$host}{'mtime'}  = $now;
-                    $config{$host}{'status'} = 'good';
+                    $config{$host}{'status-ipv4'} = 'good';
                 } else {
-                    $config{$host}{'status'} = 'failed';
+                    $config{$host}{'status-ipv4'} = 'failed';
                     failed("updating %s: unexpected status (%s)", $host, $returned);
                 }
             }
@@ -5885,18 +5885,18 @@ sub nic_he_update {
                 foreach my $line (@reply) {
                     my ($status, $ip_ignore) = split / /, lc $line;
 
-                    $config{$host}{'status'} = $status;
+                    $config{$host}{'status-ipv4'} = $status;
                     if ($status eq 'good') {
                         success("updating %s: IPv4 address set to %s", $host, $ip);
-                        $config{$host}{'ip'}    = $ip;
+                        $config{$host}{'ipv4'}  = $ip;
                         $config{$host}{'mtime'} = $now;
 
                     } elsif (exists $errors{$status}) {
                         if (($status eq 'nochg') || ($status eq 'interval')) {
                             warning("updating %s: No DNS 'A' record update required; %s", $host, $errors{$status});
-                            $config{$host}{'ip'}     = $ip;
+                            $config{$host}{'ipv4'}   = $ip;
                             $config{$host}{'mtime'}  = $now;
-                            $config{$host}{'status'} = 'good';
+                            $config{$host}{'status-ipv4'} = 'good';
 
                         } else {
                             failed("updating %s: %s: %s", $host, $status, $errors{$status});
@@ -6020,12 +6020,12 @@ sub nic_freemyip_update {
         my @reply = split /\n/, $reply;
         my $returned = pop(@reply);
         if ($returned =~ /OK/) {
-            $config{$h}{'ip'}     = $ip;
+            $config{$h}{'ipv4'}   = $ip;
             $config{$h}{'mtime'}  = $now;
-            $config{$h}{'status'} = 'good';
-            success("updating %s: good: IP address set to %s", $h, $ip);
+            $config{$h}{'status-ipv4'} = 'good';
+            success("updating %s: good: IPv4 address set to %s", $h, $ip);
         } else {
-            $config{$h}{'status'} = 'failed';
+            $config{$h}{'status-ipv4'} = 'failed';
             failed("updating %s: Server said: '%s'", $h, $returned);
         }
     }
@@ -6164,18 +6164,18 @@ sub nic_woima_update {
                 my ($status, $returnedip) = split / /, lc $line;
                 $ip = $returnedip if (not $ip);
 
-                $config{$h}{'status'} = $status;
+                $config{$h}{'status-ipv4'} = $status;
                 if ($status eq 'good') {
-                    $config{$h}{'ip'}    = $ip;
+                    $config{$h}{'ipv4'}  = $ip;
                     $config{$h}{'mtime'} = $now;
-                    success("updating %s: %s: IP address set to %s", $h, $status, $ip);
+                    success("updating %s: %s: IPv4 address set to %s", $h, $status, $ip);
 
                 } elsif (exists $errors{$status}) {
                     if ($status eq 'nochg') {
                         warning("updating %s: %s: %s", $h, $status, $errors{$status});
-                        $config{$h}{'ip'}     = $ip;
+                        $config{$h}{'ipv4'}   = $ip;
                         $config{$h}{'mtime'}  = $now;
-                        $config{$h}{'status'} = 'good';
+                        $config{$h}{'status-ipv4'} = 'good';
 
                     } else {
                         failed("updating %s: %s: %s", $h, $status, $errors{$status});
@@ -6266,12 +6266,12 @@ sub nic_dondominio_update {
         my @reply = split /\n/, $reply;
         my $returned = pop(@reply);
         if ($returned =~ /OK/) {
-            $config{$h}{'ip'}     = $ip;
+            $config{$h}{'ipv4'}   = $ip;
             $config{$h}{'mtime'}  = $now;
-            $config{$h}{'status'} = 'good';
+            $config{$h}{'status-ipv4'} = 'good';
             success("updating %s: good: IP address set to %s", $h, $ip);
         } else {
-            $config{$h}{'status'} = 'failed';
+            $config{$h}{'status-ipv4'} = 'failed';
             failed("updating %s: Server said: '%s'", $h, $returned);
         }
     }
@@ -6352,12 +6352,12 @@ sub nic_dnsmadeeasy_update {
         my @reply = split /\n/, $reply;
         my $returned = pop(@reply);
         if ($returned =~ 'success') {
-            $config{$h}{'ip'}     = $ip;
+            $config{$h}{'ipv4'}   = $ip;
             $config{$h}{'mtime'}  = $now;
-            $config{$h}{'status'} = 'good';
-            success("Updating %s: good: IP address set to %s", $h, $ip);
+            $config{$h}{'status-ipv4'} = 'good';
+            success("Updating %s: good: IPv4 address set to %s", $h, $ip);
         } else {
-            $config{$h}{'status'} = 'failed';
+            $config{$h}{'status-ipv4'} = 'failed';
             failed("Updating %s: Server said: '%s': %s", $h, $returned, $messages{$returned});
         }
     }
@@ -6426,16 +6426,16 @@ sub nic_ovh_update {
         my @reply = split /\n/, $reply;
         my $returned = pop(@reply);
         if ($returned =~ /good/ || $returned =~ /nochg/) {
-            $config{$h}{'ip'}     = $ip;
+            $config{$h}{'ipv4'}   = $ip;
             $config{$h}{'mtime'}  = $now;
-            $config{$h}{'status'} = 'good';
+            $config{$h}{'status-ipv4'} = 'good';
             if ($returned =~ /good/) {
-                success("updating %s: good: IP address set to %s", $h, $ip);
+                success("updating %s: good: IPv4 address set to %s", $h, $ip);
             } else {
-                success("updating %s: skipped: IP address was already set to %s.", $h, $ip);
+                success("updating %s: skipped: IPv4 address was already set to %s.", $h, $ip);
             }
         } else {
-            $config{$h}{'status'} = 'failed';
+            $config{$h}{'status-ipv4'} = 'failed';
             failed("updating %s: Server said: '%s'", $h, $returned);
         }
     }
@@ -6486,21 +6486,21 @@ sub nic_cloudns_update {
             headers => "X-Forwarded-For: $ip\n",
         );
         if (($reply // '') eq '' || !header_ok($hosts, $reply)) {
-            $config{$_}{'status'} = 'failed' for @hosts;
+            $config{$_}{'status-ipv4'} = 'failed' for @hosts;
             failed("updating %s: failed to visit DynURL", $hosts);
             next;
         }
         $reply =~ s/^.*?\n\n//s;  # Strip the headers.
         chomp($reply);
         if ($reply eq "The record's key is wrong!" || $reply eq "Invalid request.") {
-            $config{$_}{'status'} = 'failed' for @hosts;
+            $config{$_}{'status-ipv4'} = 'failed' for @hosts;
             failed("updating %s: %s", $hosts, $reply);
             next;
         }
         # There's no documentation explaining possible return values, so we assume success.
-        $config{$_}{'ip'} = $ip for @hosts;
+        $config{$_}{'ipv4'} = $ip for @hosts;
         $config{$_}{'mtime'} = $now for @hosts;
-        $config{$_}{'status'} = 'good' for @hosts;
+        $config{$_}{'status-ipv4'} = 'good' for @hosts;
         success("updating %s: IP address set to %s", $hosts, $ip);
     }
 }
@@ -6535,7 +6535,7 @@ EoEXAMPLE
 sub nic_dinahosting_update {
     debug("\nnic_dinahosting_update -------------------");
     for my $h (@_) {
-        my $ip = delete $config{$h}{'wantipv4'};
+        my $ip = delete $config{$h}{'wantip'};
         info("setting IP address to %s for %s", $ip, $h);
         verbose("UPDATE:", "updating %s", $h);
         my ($hostname, $domain) = split(/\./, $h, 2);
@@ -6565,10 +6565,10 @@ sub nic_dinahosting_update {
             failed("updating %s: error %d: %s", $code, $message);
             next;
         }
-        $config{$h}{'ip'}     = $ip;
+        $config{$h}{'ip'}   = $ip;
         $config{$h}{'mtime'}  = $now;
         $config{$h}{'status'} = 'good';
-        success("updating %s: IP address set to %s", $h, $ip);
+        success("updating %s: IPv4 address set to %s", $h, $ip);
     }
 }
 
@@ -6617,7 +6617,7 @@ sub nic_gandi_update {
 
     # Update each set configured host.
     foreach my $h (@_) {
-        my $ip = delete $config{$h}{'wantipv4'};
+        my $ip = delete $config{$h}{'wantip'};
         (my $hostname = $h) =~ s/\.\Q$config{$h}{zone}\E$//;
 
         info("%s -- Setting IP address to %s.", $h, $ip);
