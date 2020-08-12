@@ -3801,7 +3801,7 @@ sub nic_dyndns1_update {
     debug("\nnic_dyndns1_update -------------------");
     ## update each configured host
     foreach my $h (@_) {
-        my $ip = delete $config{$h}{'wantip'};
+        my $ip = delete $config{$h}{'wantipv4'};
         info("setting IP address to %s for %s", $ip, $h);
         verbose("UPDATE:", "updating %s", $h);
 
@@ -3954,8 +3954,8 @@ sub nic_dyndns2_update {
         my @hosts = @{$groups{$sig}};
         my $hosts = join(',', @hosts);
         my $h     = $hosts[0];
-        my $ip    = $config{$h}{'wantip'};
-        delete $config{$_}{'wantip'} foreach @hosts;
+        my $ip    = $config{$h}{'wantipv4'};
+        delete $config{$_}{'wantipv4'} foreach @hosts;
 
         info("setting IP address to %s for %s", $ip, $hosts);
         verbose("UPDATE:", "updating %s", $hosts);
@@ -4083,8 +4083,8 @@ sub nic_noip_update {
         my @hosts = @{$groups{$sig}};
         my $hosts = join(',', @hosts);
         my $h     = $hosts[0];
-        my $ip    = $config{$h}{'wantip'};
-        delete $config{$_}{'wantip'} foreach @hosts;
+        my $ip    = $config{$h}{'wantipv4'};
+        delete $config{$_}{'wantipv4'} foreach @hosts;
 
         info("setting IP address to %s for %s", $ip, $hosts);
         verbose("UPDATE:", "updating %s", $hosts);
@@ -4223,7 +4223,7 @@ sub nic_dslreports1_update {
     debug("\nnic_dslreports1_update -------------------");
     ## update each configured host
     foreach my $h (@_) {
-        my $ip = delete $config{$h}{'wantip'};
+        my $ip = delete $config{$h}{'wantipv4'};
         info("setting IP address to %s for %s", $ip, $h);
         verbose("UPDATE:", "updating %s", $h);
 
@@ -4323,8 +4323,8 @@ sub nic_zoneedit1_update {
         my @hosts = @{$groups{$sig}};
         my $hosts = join(',', @hosts);
         my $h     = $hosts[0];
-        my $ip    = $config{$h}{'wantip'};
-        delete $config{$_}{'wantip'} foreach @hosts;
+        my $ip    = $config{$h}{'wantipv4'};
+        delete $config{$_}{'wantipv4'} foreach @hosts;
 
         info("setting IP address to %s for %s", $ip, $hosts);
         verbose("UPDATE:", "updating %s", $hosts);
@@ -4470,8 +4470,8 @@ sub nic_easydns_update {
         my @hosts = @{$groups{$sig}};
         my $hosts = join(',', @hosts);
         my $h     = $hosts[0];
-        my $ip    = $config{$h}{'wantip'};
-        delete $config{$_}{'wantip'} foreach @hosts;
+        my $ip    = $config{$h}{'wantipv4'};
+        delete $config{$_}{'wantipv4'} foreach @hosts;
 
         info("setting IP address to %s for %s", $ip, $hosts);
         verbose("UPDATE:", "updating %s", $hosts);
@@ -4594,7 +4594,7 @@ sub nic_namecheap_update {
 
     ## update each configured host
     foreach my $h (@_) {
-        my $ip = delete $config{$h}{'wantip'};
+        my $ip = delete $config{$h}{'wantipv4'};
         info("setting IP address to %s for %s", $ip, $h);
         verbose("UPDATE:", "updating %s", $h);
 
@@ -4800,7 +4800,7 @@ sub nic_nfsn_update {
             $name =~ s/(.*)\.${zone}$/$1/;
         }
 
-        my $ip = delete $config{$h}{'wantip'};
+        my $ip = delete $config{$h}{'wantipv4'};
         info("setting IP address to %s for %s", $ip, $h);
         verbose("UPDATE", "updating %s", $h);
 
@@ -4905,7 +4905,7 @@ sub nic_sitelutions_update {
 
     ## update each configured host
     foreach my $h (@_) {
-        my $ip = delete $config{$h}{'wantip'};
+        my $ip = delete $config{$h}{'wantipv4'};
         info("setting IP address to %s for %s", $ip, $h);
         verbose("UPDATE:", "updating %s", $h);
 
@@ -5130,7 +5130,7 @@ sub nic_changeip_update {
 
     ## update each configured host
     foreach my $h (@_) {
-        my $ip = delete $config{$h}{'wantip'};
+        my $ip = delete $config{$h}{'wantipv4'};
         info("setting IP address to %s for %s", $ip, $h);
         verbose("UPDATE:", "updating %s", $h);
 
@@ -5212,11 +5212,11 @@ sub nic_googledomains_update {
     foreach my $sig (keys %groups) {
         my @hosts = @{$groups{$sig}};
         my $key   = $hosts[0];
-        my $ip    = $config{$key}{'wantip'};
+        my $ip    = $config{$key}{'wantipv4'};
 
         # FQDNs
         for my $host (@hosts) {
-            delete $config{$host}{'wantip'};
+            delete $config{$host}{'wantipv4'};
 
             info("setting IP address to %s for %s", $ip, $host);
             verbose("UPDATE:", "updating %s", $host);
@@ -5315,9 +5315,9 @@ sub nic_nsupdate_update {
         ## nsupdate requires a port number to be separated by whitepace, not colon
         $server =~ s/:/ /;
         my $zone       = $config{$h}{'zone'};
-        my $ip         = $config{$h}{'wantip'};
+        my $ip         = $config{$h}{'wantipv4'};
         my $ipv6 = $config{$h}{'wantipv6'};
-        delete $config{$_}{'wantip'} foreach @hosts;
+        delete $config{$_}{'wantipv4'} foreach @hosts;
         delete $config{$_}{'wantipv6'} foreach @hosts;
 
 ##TODO
@@ -5613,12 +5613,12 @@ sub nic_yandex_update {
     foreach my $sig (keys %groups) {
         my @hosts   = @{$groups{$sig}};
         my $key     = $hosts[0];
-        my $ip      = $config{$key}{'wantip'};
+        my $ip      = $config{$key}{'wantipv4'};
         my $headers = "PddToken: $config{$key}{'password'}\n";
 
         # FQDNs
         for my $host (@hosts) {
-            delete $config{$host}{'wantip'};
+            delete $config{$host}{'wantipv4'};
 
             info("setting IP address to %s for %s", $ip, $host);
             verbose("UPDATE:", "updating %s", $host);
@@ -5736,7 +5736,7 @@ sub nic_duckdns_update {
 
         # FQDNs
         for my $host (@hosts) {
-            my $ip    = delete $config{$host}{'wantip'};
+            my $ip    = delete $config{$host}{'wantipv4'};
             my $ipv6  = delete $config{$host}{'wantipv6'};
 
             my $nq_host = $host;
@@ -5858,7 +5858,7 @@ sub nic_he_update {
 
         # FQDNs
         for my $host (@hosts) {
-            my $ip    = delete $config{$host}{'wantip'};
+            my $ip    = delete $config{$host}{'wantipv4'};
             my $ipv6  = delete $config{$host}{'wantipv6'};
 
             if (defined($ip)) {
@@ -5995,7 +5995,7 @@ sub nic_freemyip_update {
     debug("\nnic_freemyip_update -------------------");
 
     foreach my $h (@_) {
-        my $ip = delete $config{$h}{'wantip'};
+        my $ip = delete $config{$h}{'wantipv4'};
         info("setting IP address to %s for %s", $ip, $h);
         verbose("UPDATE:", "updating %s", $h);
 
@@ -6103,8 +6103,7 @@ sub nic_woima_update {
     );
 
     for my $h (@_) {
-        my $ip = $config{$h}{'wantip'};
-        delete $config{$h}{'wantip'};
+        my $ip = delete $config{$h}{'wantipv4'};
 
         info("setting IP address to %s for %s", $ip, $h);
         verbose("UPDATE:", "updating %s", $h);
@@ -6237,7 +6236,7 @@ sub nic_dondominio_update {
     ## update each configured host
     ## should improve to update in one pass
     foreach my $h (@_) {
-        my $ip = delete $config{$h}{'wantip'};
+        my $ip = delete $config{$h}{'wantipv4'};
         info("setting IP address to %s for %s", $ip, $h);
         verbose("UPDATE:", "updating %s", $h);
 
@@ -6327,7 +6326,7 @@ sub nic_dnsmadeeasy_update {
     ## update each configured host
     ## should improve to update in one pass
     foreach my $h (@_) {
-        my $ip = delete $config{$h}{'wantip'};
+        my $ip = delete $config{$h}{'wantipv4'};
         info("Setting IP address to %s for %s", $ip, $h);
         verbose("UPDATE:", "Updating %s", $h);
 
@@ -6401,7 +6400,7 @@ sub nic_ovh_update {
     ## update each configured host
     ## should improve to update in one pass
     foreach my $h (@_) {
-        my $ip = delete $config{$h}{'wantip'};
+        my $ip = delete $config{$h}{'wantipv4'};
         info("setting IP address to %s for %s", $ip, $h);
         verbose("UPDATE:","updating %s", $h);
 
@@ -6474,9 +6473,9 @@ sub nic_cloudns_update {
     for my $hr (values(%groups)) {
         my @hosts = @$hr;
         my $hosts = join(',', @hosts);
-        my $ip = $config{$hosts[0]}{'wantip'};
+        my $ip = $config{$hosts[0]}{'wantipv4'};
         my $dynurl = $config{$hosts[0]}{'dynurl'};
-        delete $config{$_}{'wantip'} for @hosts;
+        delete $config{$_}{'wantipv4'} for @hosts;
         # https://www.cloudns.net/wiki/article/36/ says, "If you are behind a proxy and your real
         # IP is set in the header X-Forwarded-For you need to add &proxy=1 at the end of the
         # DynamicURL." We abuse this to pass the desired IP address to ClouDNS, which might not be
@@ -6536,7 +6535,7 @@ EoEXAMPLE
 sub nic_dinahosting_update {
     debug("\nnic_dinahosting_update -------------------");
     for my $h (@_) {
-        my $ip = delete $config{$h}{'wantip'};
+        my $ip = delete $config{$h}{'wantipv4'};
         info("setting IP address to %s for %s", $ip, $h);
         verbose("UPDATE:", "updating %s", $h);
         my ($hostname, $domain) = split(/\./, $h, 2);
@@ -6618,7 +6617,7 @@ sub nic_gandi_update {
 
     # Update each set configured host.
     foreach my $h (@_) {
-        my $ip = delete $config{$h}{'wantip'};
+        my $ip = delete $config{$h}{'wantipv4'};
         (my $hostname = $h) =~ s/\.\Q$config{$h}{zone}\E$//;
 
         info("%s -- Setting IP address to %s.", $h, $ip);
