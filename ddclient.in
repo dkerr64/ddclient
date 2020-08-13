@@ -2986,7 +2986,7 @@ sub get_default_interface {
 
     return undef if (($ipver != 4) && ($ipver != 6));
 
-    if ($reply eq '') { ## skip if test data passed in.
+    if (!$reply) { ## skip if test data passed in.
         ## Best option is the ip command from iproute2 package
         $cmd = "ip -$ipver -o route list match default"; $reply = qx{ $cmd 2>/dev/null };
         ## Fallback is the netstat command. This is only option on MacOS.
@@ -3000,7 +3000,7 @@ sub get_default_interface {
     debug("Reply from '%s' :\n------\n%s------", $cmd, $reply);
 
     # Check we have IPv6 address in case we got routing table from non-specific cmd above
-    return undef if (($ipver ==6) && !extract_ipv6($reply));
+    return undef if (($ipver == 6) && !extract_ipv6($reply));
     # Filter down to just the default interfaces
     my @list = split(/\n/, $reply);
     @list = grep(/^default|^(?:0\.){3}0|^::\/0/, @list); # Select 'default' or '0.0.0.0' or '::/0'
@@ -3047,13 +3047,13 @@ sub get_ip_from_interface {
         return undef;
     }
 
-    if ((lc($interface) eq "default") && ($reply eq '')) { ## skip if test data passed in.
+    if ((lc($interface) eq "default") && (!$reply)) { ## skip if test data passed in.
         $interface = get_default_interface($ipver);
         return undef if !defined($interface);
     }
 
     if ($ipver == 4) {
-        if ($reply eq '') { ## skip if test data passed in.
+        if (!$reply) { ## skip if test data passed in.
             ## Try ip first, then ifconfig.
             $cmd = "ip -4 -o addr show dev $interface scope global"; $reply = qx{$cmd 2>/dev/null};
             if ($?) { $cmd = "ifconfig $interface";                  $reply = qx{$cmd 2>/dev/null}; }
@@ -3076,7 +3076,7 @@ sub get_ip_from_interface {
     }
 
     $cmd = "test data";
-    if ($reply eq '') { ## skip if test data passed in.
+    if (!$reply) { ## skip if test data passed in.
         ## Try ip first, then ifconfig with -L for MacOS/FreeBSD then finally ifconfig for everything else
         $cmd = "ip -6 -o addr show dev $interface scope global"; $reply = qx{$cmd 2>/dev/null};   # Linux
         if ($?) { $cmd = "ifconfig -L $interface"; $MacOS = 1;   $reply = qx{$cmd 2>/dev/null}; } # MacOS/FreeBSD
